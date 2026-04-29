@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager - Development</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #1c1e21;
+        }
+        .card {
+            text-align: center;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 420px;
+            width: 90%;
+        }
+        h1 {
+            font-size: 26px;
+            margin-bottom: 16px;
+            color: #1a73e8;
+        }
+        p {
+            font-size: 15px;
+            color: #606770;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .btn {
+            display: block;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-auth {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .btn-auth:hover {
+            background-color: #1557b0;
+        }
+        .btn-profile {
+            background-color: #ffffff;
+            color: #4b4f56;
+            border: 1px solid #ccd0d5;
+        }
+        .btn-profile:hover {
+            background-color: #f5f6f7;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .status-tag {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1967d2;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="status-tag">Development Hub</div>
+    <h1>Task Manager</h1>
+    <p>This is a temporary development page. Use the central identity provider to access the resource server.</p>
+
+    <div class="controls">
+        <button id="authTrigger" class="btn btn-auth">
+            Authenticate via IDP
+        </button>
+
+        <a href="/profile.html" class="btn btn-profile">
+            View My Profile
+        </a>
+    </div>
+</div>
+
+<script>
+    const AUTH_PARAMS = {
+        gate: "http://localhost:443/authenticate",
+        callback: "http://127.0.0.1:8080/api/authenticate",
+        auditor: "my_tm"
+    };
+
+    const authBtn = document.getElementById('authTrigger');
+
+    authBtn.addEventListener('click', () => {
+        const searchParams = new URLSearchParams({
+            redirect_url: AUTH_PARAMS.callback,
+            auditor: AUTH_PARAMS.auditor
+        });
+
+        const finalUrl = `${AUTH_PARAMS.gate}?${searchParams.toString()}`;
+        window.location.href = finalUrl;
+    });
+</script>
+</body>
+</html>

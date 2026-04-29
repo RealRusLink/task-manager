@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Profile</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #1c1e21;
+        }
+        .card {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+        }
+        h2 { font-size: 24px; margin-bottom: 20px; color: #1a73e8; }
+        .hidden { display: none; }
+
+        .info-box {
+            text-align: left;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .label {
+            font-weight: bold;
+            color: #8d949e;
+            font-size: 11px;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .value { color: #1c1e21; font-size: 15px; word-break: break-all; }
+        .jwt-scroll {
+            font-family: monospace;
+            font-size: 11px;
+            color: #1a73e8;
+            max-height: 60px;
+            overflow-y: auto;
+            background: #e8f0fe;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 25px; }
+        .btn {
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: 0.2s;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-auth { background: #1a73e8; color: white; width: 100%; }
+        .btn-logout { background: #dc3545; color: white; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:active { transform: scale(0.98); }
+
+        #loader { color: #606770; font-style: italic; }
+        .no-auth-msg { color: #606770; margin-bottom: 20px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Profile Management</h2>
+
+    <div id="loader">Checking session status...</div>
+
+    <div id="authSection" class="hidden">
+        <div class="info-box">
+            <span class="label">Username</span>
+            <span id="userName" class="value"></span>
+        </div>
+        <div class="info-box">
+            <span class="label">Email</span>
+            <span id="userEmail" class="value"></span>
+        </div>
+        <div class="info-box">
+            <span class="label">Local JWT</span>
+            <div id="userJwt" class="jwt-scroll"></div>
+        </div>
+        <div class="btn-group">
+            <button onclick="handleLogout()" class="btn btn-logout">Sign Out</button>
+        </div>
+    </div>
+
+    <div id="guestSection" class="hidden">
+        <p class="no-auth-msg">Your session is inactive. Please authenticate via our Identity Provider to access this resource.</p>
+        <div class="btn-group">
+            <button onclick="startIdpAuth()" class="btn btn-auth">Authenticate via IDP</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const AUTH_CONFIG = {
+        gate: "http://localhost:443/authenticate",
+        callback: "http://127.0.0.1:8080/api/authenticate",
+        auditor: "my_tm"
+    };
+
+    const loader = document.getElementById('loader');
+    const authSection = document.getElementById('authSection');
+    const guestSection = document.getElementById('guestSection');
+
+    async function fetchProfile() {
+        try {
+            const response = await fetch('/api/user', { method: 'GET' });
+            loader.classList.add('hidden');
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('userName').innerText = data.userData.username;
+                document.getElementById('userEmail').innerText = data.userData.email;
+                document.getElementById('userJwt').innerText = data.jwt;
+                authSection.classList.remove('hidden');
+            } else {
+                guestSection.classList.remove('hidden');
+            }
+        } catch (err) {
+            loader.innerText = "Connection error. Ensure the server is online.";
+        }
+    }
+
+    function startIdpAuth() {
+        const params = new URLSearchParams({
+            redirect_url: AUTH_CONFIG.callback,
+            auditor: AUTH_CONFIG.auditor
+        });
+        window.location.href = `${AUTH_CONFIG.gate}?${params.toString()}`;
+    }
+
+    function handleLogout() {
+        const returnUrl = window.location.origin + '/profile.html';
+        window.location.href = `/api/user/logout?redirect_url=${encodeURIComponent(returnUrl)}`;
+    }
+
+    fetchProfile();
+</script>
+
+</body>
+</html>
