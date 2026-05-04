@@ -1,10 +1,11 @@
 import {type Context, type MiddlewareHandler, type Next} from "hono";
 import  { getCookie } from "hono/cookie"
 import {type LoggerService} from "logger/dist/index.js"
-import {AppError, BusinessError} from "../errors/types.js";
+import {AppError, BusinessError, InfrastructureError} from "../errors/types.js";
 import {type JWTPayload, TokenManager} from "../crypto/token.js";
 import type {KeyFetcher} from "../back2back/key.js";
 import type {DBAdapter} from "../db/adapter.js";
+import type {Config} from "../config.js";
 /**
  * Base abstract class for creating Hono middleware.
  * Exposes a standardized handler that bridges Hono's middleware interface with the internal execute logic.
@@ -138,7 +139,32 @@ export class AuthenticationMiddleware extends Middleware {
 }
 
 
+export class FreshnessGuardMiddleware extends Middleware {
+    config: Config;
 
+    constructor(config: Config) {
+        super();
+        this.config = config;
+    }
+
+    execute = async (c: Context, next: () => Promise<void>) => {
+        const userData = c.get("userData") as JWTPayload;
+
+        if (!userData || typeof userData.iat !== 'number') {
+            throw new InfrastructureError("Auth middleware failed", 500);
+        }
+
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const tokenAgeSeconds = nowSeconds - userData.iat;
+        const maxAgeSeconds = Math.floor(this.config.authentication.secureTTL / 1000);
+
+        if (tokenAgeSeconds > maxAgeSeconds) {
+            throw new BusinessError("Session expired", 403);
+        }
+
+        await next();
+    }
+}
 
 
 

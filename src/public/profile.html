@@ -3,156 +3,392 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resource Profile</title>
+    <title>User Profile | Management</title>
     <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass: rgba(255, 255, 255, 0.95);
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --error: #ef4444;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-main);
+        }
+
+        .hidden { display: none !important; }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-logo {
+            color: white;
+            font-weight: 800;
+            font-size: 1.2rem;
+            text-decoration: none;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            transition: 0.2s;
+        }
+
+        .nav-link:hover { opacity: 1; }
+
+        .container {
+            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            color: #1c1e21;
+            padding: 2rem;
         }
-        .card {
-            background: #ffffff;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            max-width: 450px;
-            width: 90%;
-            text-align: center;
-        }
-        h2 { font-size: 24px; margin-bottom: 20px; color: #1a73e8; }
-        .hidden { display: none; }
 
-        .info-box {
-            text-align: left;
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+        .profile-wrapper {
+            width: 100%;
+            max-width: 800px;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 1.5rem;
         }
-        .label {
+
+        @media (max-width: 768px) {
+            .profile-wrapper { grid-template-columns: 1fr; }
+        }
+
+        .glass-card {
+            background: var(--glass);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .user-header { text-align: center; }
+        .avatar-circle {
+            width: 80px;
+            height: 80px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
             font-weight: bold;
-            color: #8d949e;
-            font-size: 11px;
+            margin: 0 auto 1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
             text-transform: uppercase;
-            display: block;
-            margin-bottom: 5px;
         }
-        .value { color: #1c1e21; font-size: 15px; word-break: break-all; }
-        .jwt-scroll {
-            font-family: monospace;
-            font-size: 11px;
-            color: #1a73e8;
-            max-height: 60px;
-            overflow-y: auto;
-            background: #e8f0fe;
-            padding: 5px;
-            border-radius: 4px;
-        }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-inactive { background: #fee2e2; color: #991b1b; }
 
-        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 25px; }
+        .data-list { margin-top: 1.5rem; }
+        .data-item {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .data-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .data-value { display: block; font-weight: 500; margin-top: 2px; }
+
+        .edit-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .input-edit {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-edit:focus { border-color: var(--primary); }
+
+        .identity-grid { display: flex; flex-direction: column; gap: 1rem; }
+        .idp-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: 0.3s;
+        }
+        .idp-icon { width: 40px; height: 40px; background: #f3f4f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--primary); }
+
         .btn {
-            padding: 12px;
-            border-radius: 6px;
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
             font-weight: 600;
-            text-decoration: none;
-            transition: 0.2s;
-            border: none;
             cursor: pointer;
-            font-size: 14px;
+            transition: 0.2s;
+            text-align: center;
+            border: none;
+            font-size: 0.9rem;
+            text-decoration: none;
         }
-        .btn-auth { background: #1a73e8; color: white; width: 100%; }
-        .btn-logout { background: #dc3545; color: white; }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-outline { border: 2px solid #e5e7eb; color: var(--text-muted); background: transparent; }
+        .btn-outline:hover { background: #f9fafb; color: var(--text-main); }
+        .btn-small { padding: 6px 12px; font-size: 0.8rem; }
 
-        #loader { color: #606770; font-style: italic; }
-        .no-auth-msg { color: #606770; margin-bottom: 20px; line-height: 1.4; }
+        .error-msg {
+            color: var(--error);
+            font-size: 0.8rem;
+            margin-top: 6px;
+            text-align: left;
+            min-height: 1.2rem;
+            font-weight: 500;
+        }
+
+        #loader { color: white; font-weight: 500; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Profile Management</h2>
+<nav class="navbar">
+    <a href="/" class="nav-logo">RESOURCE.CORE</a>
+    <a href="/" class="nav-link">Home Page</a>
+</nav>
 
-    <div id="loader">Checking session status...</div>
+<div class="container">
+    <div id="loader">SECURE CONNECTING...</div>
 
-    <div id="authSection" class="hidden">
-        <div class="info-box">
-            <span class="label">Username</span>
-            <span id="userName" class="value"></span>
+    <div id="authSection" class="profile-wrapper hidden">
+        <div class="glass-card user-header">
+            <div class="avatar-circle" id="avatarLetter">?</div>
+
+            <div id="nameView">
+                <h3 id="userNameDisplay" style="margin: 0.5rem 0 0.2rem 0;"></h3>
+                <button onclick="toggleEdit(true)" class="btn btn-outline btn-small" style="margin-bottom: 10px;">Edit Name</button>
+            </div>
+
+            <div id="nameEdit" class="hidden">
+                <div class="edit-group">
+                    <input type="text" id="usernameInput" class="input-edit" placeholder="New username">
+                    <button id="saveBtn" onclick="submitUsername()" class="btn btn-primary btn-small">Save</button>
+                </div>
+                <div id="usernameError" class="error-msg"></div>
+                <button onclick="toggleEdit(false)" class="btn btn-outline btn-small" style="margin-top: 4px; width: 100%;">Cancel</button>
+            </div>
+
+            <div id="userStatusBadge" class="status-badge" style="margin-top: 5px;"></div>
+
+            <div class="data-list" style="text-align: left;">
+                <div class="data-item">
+                    <span class="data-label">Member Since</span>
+                    <span id="userCreated" class="data-value"></span>
+                </div>
+            </div>
+
+            <button onclick="handleLogout()" class="btn btn-outline" style="margin-top: 1rem; width: 100%;">Sign Out</button>
         </div>
-        <div class="info-box">
-            <span class="label">Email</span>
-            <span id="userEmail" class="value"></span>
-        </div>
-        <div class="info-box">
-            <span class="label">Local JWT</span>
-            <div id="userJwt" class="jwt-scroll"></div>
-        </div>
-        <div class="btn-group">
-            <button onclick="handleLogout()" class="btn btn-logout">Sign Out</button>
+
+        <div class="glass-card">
+            <h4 style="margin-top: 0;">Connected Identities</h4>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">External accounts linked to your core profile.</p>
+            <div id="identitiesList" class="identity-grid"></div>
         </div>
     </div>
 
-    <div id="guestSection" class="hidden">
-        <p class="no-auth-msg">Your session is inactive. Please authenticate via our Identity Provider to access this resource.</p>
-        <div class="btn-group">
-            <button onclick="startIdpAuth()" class="btn btn-auth">Authenticate via IDP</button>
-        </div>
+    <div id="guestSection" class="glass-card hidden" style="max-width: 400px; text-align: center;">
+        <h2 style="margin-top: 0;">Access Required</h2>
+        <p style="color: var(--text-muted);">Your session is inactive. Please authenticate via our Identity Provider.</p>
+        <button onclick="startIdpAuth()" class="btn btn-primary" style="margin-top: 1rem; width: 100%;">Authenticate via IDP</button>
     </div>
 </div>
 
 <script>
     const AUTH_CONFIG = {
         gate: "http://localhost:443/authenticate",
-        callback: "http://127.0.0.1:8080/api/authenticate",
+        callback: window.location.origin + "/api/authenticate",
         auditor: "my_tm"
     };
 
-    const loader = document.getElementById('loader');
-    const authSection = document.getElementById('authSection');
-    const guestSection = document.getElementById('guestSection');
+    let CURRENT_USERNAME = "";
 
-    async function fetchProfile() {
-        try {
-            const response = await fetch('/api/user', { method: 'GET' });
-            loader.classList.add('hidden');
+    function toggleEdit(show) {
+        const errorEl = document.getElementById('usernameError');
+        const input = document.getElementById('usernameInput');
 
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('userName').innerText = data.userData.username;
-                document.getElementById('userEmail').innerText = data.userData.email;
-                document.getElementById('userJwt').innerText = data.jwt;
-                authSection.classList.remove('hidden');
-            } else {
-                guestSection.classList.remove('hidden');
-            }
-        } catch (err) {
-            loader.innerText = "Connection error. Ensure the server is online.";
+        document.getElementById('nameView').classList.toggle('hidden', show);
+        document.getElementById('nameEdit').classList.toggle('hidden', !show);
+
+        if (show) {
+            errorEl.innerText = "";
+            input.value = CURRENT_USERNAME;
+            input.style.borderColor = "#e5e7eb";
+            input.focus();
         }
     }
 
-    function startIdpAuth() {
+    async function submitUsername() {
+        const input = document.getElementById('usernameInput');
+        const errorEl = document.getElementById('usernameError');
+        const saveBtn = document.getElementById('saveBtn');
+        const newName = input.value.trim();
+
+        errorEl.innerText = "";
+        input.style.borderColor = "#e5e7eb";
+
+        if (newName === CURRENT_USERNAME) {
+            errorEl.innerText = "Please choose a different name";
+            return;
+        }
+
+        if (newName.length < 3) {
+            errorEl.innerText = "Username must be at least 3 characters";
+            input.style.borderColor = "var(--error)";
+            return;
+        }
+
+        try {
+            saveBtn.disabled = true;
+
+            const response = await fetch('/api/user/protected/username', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: newName })
+            });
+            if (response.status === 403) {
+                const msg = await response.text();
+                errorEl.innerText = `${msg}. Redirecting...`;
+                setTimeout(() => startIdpAuth(true), 1500);
+                return;
+            }
+
+            if (response.status === 401) {
+                window.location.reload();
+                return;
+            }
+            const contentType = response.headers.get("content-type");
+            let finalMessage = "Update failed";
+
+            if (contentType && contentType.includes("application/json")) {
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    await fetchProfile();
+                    toggleEdit(false);
+                    return;
+                }
+                finalMessage = result.message || finalMessage;
+            } else {
+                finalMessage = await response.text() || finalMessage;
+            }
+
+            errorEl.innerText = finalMessage;
+            input.style.borderColor = "var(--error)";
+
+        } catch (err) {
+            errorEl.innerText = "Network error. Try again later.";
+        } finally {
+            saveBtn.disabled = false;
+        }
+    }
+
+    async function fetchProfile() {
+        const loader = document.getElementById('loader');
+        const authSection = document.getElementById('authSection');
+        const guestSection = document.getElementById('guestSection');
+
+        try {
+            const response = await fetch('/api/user');
+
+            if (response.ok) {
+                const data = await response.json();
+
+                CURRENT_USERNAME = data.user.username;
+                document.getElementById('userNameDisplay').innerText = CURRENT_USERNAME;
+                document.getElementById('avatarLetter').innerText = CURRENT_USERNAME.charAt(0).toUpperCase();
+
+                const statusEl = document.getElementById('userStatusBadge');
+                statusEl.innerText = data.user.active ? 'Active Account' : 'Inactive';
+                statusEl.className = 'status-badge ' + (data.user.active ? 'status-active' : 'status-inactive');
+
+                const date = new Date(data.user.created);
+                document.getElementById('userCreated').innerText = date.toLocaleDateString('de-DE');
+
+                const list = document.getElementById('identitiesList');
+                list.innerHTML = '';
+
+                data.identities.forEach(idnt => {
+                    const card = document.createElement('div');
+                    card.className = 'idp-card';
+                    card.innerHTML = `
+                        <div class="idp-icon">${idnt.idp.charAt(0).toUpperCase()}</div>
+                        <div style="flex:1">
+                            <div style="font-weight: 700; font-size: 0.9rem;">${idnt.idp.toUpperCase()}</div>
+                            <div style="color: var(--text-muted); font-size: 0.8rem;">${idnt.username}</div>
+                            <div style="color: var(--text-muted); font-size: 0.75rem;">${idnt.email || 'No email'}</div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+
+                loader.classList.add('hidden');
+                guestSection.classList.add('hidden');
+                authSection.classList.remove('hidden');
+            } else {
+                loader.classList.add('hidden');
+                authSection.classList.add('hidden');
+                guestSection.classList.remove('hidden');
+            }
+        } catch (err) {
+            loader.innerText = "API CONNECTION ERROR";
+            loader.classList.remove('hidden');
+        }
+    }
+
+    function startIdpAuth(force = false) {
         const params = new URLSearchParams({
             redirect_url: AUTH_CONFIG.callback,
             auditor: AUTH_CONFIG.auditor
         });
+        if (force) params.append('prompt', 'login');
         window.location.href = `${AUTH_CONFIG.gate}?${params.toString()}`;
     }
 
     function handleLogout() {
-        const returnUrl = window.location.origin + '/profile.html';
-        window.location.href = `/api/user/logout?redirect_url=${encodeURIComponent(returnUrl)}`;
+        window.location.href = `/api/user/logout?redirect_url=${encodeURIComponent(window.location.origin + '/profile.html')}`;
     }
 
     fetchProfile();
 </script>
-
 </body>
 </html>

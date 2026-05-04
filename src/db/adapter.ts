@@ -125,6 +125,53 @@ export class DBAdapter {
     }
 
 
+    async getUserIdentitiesByInternalId(internalUserId: string): Promise<CreateUserIdentityFeedback[]> {
+        const query = `
+        SELECT 
+            internal_user_id, 
+            idp, 
+            idp_user_id, 
+            idp_username, 
+            idp_email, 
+            created_at
+        FROM ${this.config.db.tables.userIdentities}
+        WHERE internal_user_id = $1;
+    `;
+
+        const result = await this.connection.pool.query<CreateUserIdentityFeedback>(query, [internalUserId]);
+        return result.rows;
+    }
+
+
+    async updateUsername(id: string, newUsername: string): Promise<string | null> {
+        const query = `
+            UPDATE ${this.config.db.tables.users}
+            SET username = $1
+            WHERE id = $2
+                RETURNING username;
+        `;
+
+        const result = await this.connection.pool.query(query, [newUsername, id]);
+
+        if (result.rows.length > 0) {
+            return result.rows[0].username;
+        }
+
+        return null;
+    }
+
+
+    async isUsernameTaken(username: string): Promise<boolean> {
+        const query = `
+        SELECT 1 FROM ${this.config.db.tables.users} 
+        WHERE username = $1 
+        LIMIT 1;
+    `;
+        const result = await this.connection.pool.query(query, [username]);
+        return (result.rowCount ?? 0) > 0;
+    }
+
+
     async register(data: RegisterParams): Promise<string> {
         const client = await this.connection.pool.connect();
 

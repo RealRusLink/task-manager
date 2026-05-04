@@ -2,7 +2,7 @@ import {LoggerService, consoleConfig, type logLevel, type logSilent} from "logge
 import {Config} from "./config.js";
 import {DBConnector} from "./db/config.js";
 import {DBAdapter} from "./db/adapter.js";
-import {Api} from "./routes/api.js";
+import {Api, User} from "./routes/api.js";
 import {Web} from "./routes/web.js";
 import {type MiddlewareDeclaration, type RoutersDeclaration, Routes} from "./routes/index.js";
 import {Server} from "./server.js";
@@ -11,7 +11,7 @@ import {
     AllowRedirectMiddleware,
     JWTVerificationMiddleware,
     errorHandler,
-    LoggerMiddleware, AuthenticationMiddleware
+    LoggerMiddleware, AuthenticationMiddleware, FreshnessGuardMiddleware
 } from "./routes/middleware.js";
 import {TokenManager} from "./crypto/token.js";
 import {BusinessError} from "./errors/types.js";
@@ -141,6 +141,10 @@ const routersDeclaration: RoutersDeclaration = [
         path: "/api"
     },
     {
+        router: init(User, { message: "User api routes initialised" }, DBApi, GlobalConfig, ExchangeApi).addLogger(),
+        path: "/api/user"
+    },
+    {
         router: init(Web, { message: "Web routes initialised" }, GlobalConfig).addLogger(),
         path: "/"
     }
@@ -158,11 +162,15 @@ const middlewareDeclaration: MiddlewareDeclaration = [
     },
     {
         middlewareClass: init(JWTVerificationMiddleware, { message: "Authentication middleware initialised"}, TokenApi, KeyApi).addLogger(),
-        path: "/api/user"
+        path: "/api/user/*"
     },
     {
         middlewareClass: init(AuthenticationMiddleware, { message: "Authentication middleware initialised"}, DBApi).addLogger(),
-        path: "/api/user"
+        path: "/api/user/*"
+    },
+    {
+        middlewareClass: init(FreshnessGuardMiddleware, { message: "Freshness protection middleware initialised"}, GlobalConfig).addLogger(),
+        path: "/api/user/protected/*"
     }
 ]
 

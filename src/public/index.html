@@ -3,107 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager - Development</title>
+    <title>Task Manager - Dashboard</title>
     <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass: rgba(255, 255, 255, 0.95);
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            margin: 0;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            color: #1c1e21;
+            color: var(--text-main);
         }
-        .card {
-            text-align: center;
-            background: #ffffff;
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            max-width: 420px;
-            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            text-align: center;
         }
+
+        .status-tag {
+            display: inline-flex;
+            align-items: center;
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 24px;
+        }
+
+        .status-tag::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
         h1 {
-            font-size: 26px;
-            margin-bottom: 16px;
-            color: #1a73e8;
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+            color: #111827;
+            letter-spacing: -0.025em;
         }
+
         p {
-            font-size: 15px;
-            color: #606770;
-            margin-bottom: 30px;
-            line-height: 1.5;
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+            line-height: 1.6;
         }
+
         .controls {
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
+
         .btn {
-            display: block;
-            padding: 12px 24px;
-            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 24px;
+            border-radius: 12px;
             font-weight: 600;
-            font-size: 16px;
+            font-size: 0.95rem;
             cursor: pointer;
             text-decoration: none;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             border: none;
         }
+
         .btn-auth {
-            background-color: #1a73e8;
+            background-color: var(--primary);
             color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
         }
+
         .btn-auth:hover {
-            background-color: #1557b0;
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
         }
+
         .btn-profile {
-            background-color: #ffffff;
-            color: #4b4f56;
-            border: 1px solid #ccd0d5;
+            background-color: #f9fafb;
+            color: var(--text-main);
+            border: 1px solid #e5e7eb;
         }
+
         .btn-profile:hover {
-            background-color: #f5f6f7;
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
         }
+
         .btn:active {
             transform: scale(0.98);
         }
-        .status-tag {
-            display: inline-block;
-            background: #e8f0fe;
-            color: #1967d2;
-            padding: 4px 12px;
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            text-transform: uppercase;
+
+        .footer-note {
+            margin-top: 24px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <div class="status-tag">Development Hub</div>
-    <h1>Task Manager</h1>
-    <p>This is a temporary development page. Use the central identity provider to access the resource server.</p>
+<div class="container">
+    <div class="glass-card">
+        <div class="status-tag">Development Hub</div>
+        <h1>Task Manager</h1>
+        <p>Access the core resource server using our secure Central Identity Provider.</p>
 
-    <div class="controls">
-        <button id="authTrigger" class="btn btn-auth">
-            Authenticate via IDP
-        </button>
+        <div class="controls">
+            <button id="authTrigger" class="btn btn-auth">
+                Authenticate via IDP
+            </button>
 
-        <a href="/profile.html" class="btn btn-profile">
-            View My Profile
-        </a>
+            <a href="/profile.html" class="btn btn-profile">
+                Go to Profile
+            </a>
+        </div>
+
+        <div class="footer-note">
+            Resource Server v1.0.4-dev
+        </div>
     </div>
 </div>
 
 <script>
     const AUTH_PARAMS = {
         gate: "http://localhost:443/authenticate",
-        callback: "http://127.0.0.1:8080/api/authenticate",
+        callback: window.location.origin + "/api/authenticate",
         auditor: "my_tm"
     };
 

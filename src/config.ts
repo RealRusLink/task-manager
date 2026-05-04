@@ -22,7 +22,8 @@ const loadData = () => {
             jwtKey: process.env.JWT_KEY || "",
             exchange: process.env.EXCHANGE || "",
             refresh: process.env.REFRESH || "",
-            auditor: process.env.AUDITOR || ""
+            auditor: process.env.AUDITOR || "",
+            secureTTL: Number(process.env.SECURE_TTL || "")
         }
     };
 };
