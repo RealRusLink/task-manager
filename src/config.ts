@@ -14,6 +14,7 @@ const loadData = () => {
             password: process.env.DB_PASSWORD || "",
             tables: {
                 users: process.env.USERS_TABLE || "",
+                userIdentities: process.env.IDENTITIES_TABLE || "",
             }
         },
         authentication: {

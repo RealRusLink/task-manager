@@ -2,8 +2,9 @@ import {type Context, type MiddlewareHandler, type Next} from "hono";
 import  { getCookie } from "hono/cookie"
 import {type LoggerService} from "logger/dist/index.js"
 import {AppError, BusinessError} from "../errors/types.js";
-import {TokenManager} from "../crypto/token.js";
+import {type JWTPayload, TokenManager} from "../crypto/token.js";
 import type {KeyFetcher} from "../back2back/key.js";
+import type {DBAdapter} from "../db/adapter.js";
 /**
  * Base abstract class for creating Hono middleware.
  * Exposes a standardized handler that bridges Hono's middleware interface with the internal execute logic.
@@ -81,7 +82,7 @@ export class AllowRedirectMiddleware extends Middleware{
 
 }
 
-export class AuthenticationMiddleware extends Middleware{
+export class JWTVerificationMiddleware extends Middleware{
     TokenApi: TokenManager;
     KeyApi: KeyFetcher;
     constructor(TokenApi: TokenManager, KeyApi: KeyFetcher) {
@@ -105,6 +106,41 @@ export class AuthenticationMiddleware extends Middleware{
 
 
 }
+
+export class AuthenticationMiddleware extends Middleware {
+    DBApi: DBAdapter;
+
+    constructor(DBApi: DBAdapter) {
+        super();
+        this.DBApi = DBApi;
+    }
+
+    execute = async (c: Context, next: () => Promise<void>) => {
+        const userData = c.get("userData") as JWTPayload;
+        const identity = await this.DBApi.getUserIdentity(userData.iss, userData.sub);
+
+        let internalId: string;
+
+        if (!identity) {
+            internalId = await this.DBApi.register({
+                idp: userData.iss,
+                idp_user_id: userData.sub,
+                idp_username: userData.username,
+                idp_email: userData.email,
+            });
+        } else {
+            internalId = identity.internal_user_id;
+        }
+
+        c.set("id", internalId);
+        await next();
+    }
+}
+
+
+
+
+
 
 
 /**

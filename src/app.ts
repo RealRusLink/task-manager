@@ -9,9 +9,9 @@ import {Server} from "./server.js";
 import {DBErrorTranslator} from "./errors/translators.js";
 import {
     AllowRedirectMiddleware,
-    AuthenticationMiddleware,
+    JWTVerificationMiddleware,
     errorHandler,
-    LoggerMiddleware
+    LoggerMiddleware, AuthenticationMiddleware
 } from "./routes/middleware.js";
 import {TokenManager} from "./crypto/token.js";
 import {BusinessError} from "./errors/types.js";
@@ -157,7 +157,11 @@ const middlewareDeclaration: MiddlewareDeclaration = [
         path: "*",
     },
     {
-        middlewareClass: init(AuthenticationMiddleware, { message: "Authentication middleware initialised"}, TokenApi, KeyApi).addLogger(),
+        middlewareClass: init(JWTVerificationMiddleware, { message: "Authentication middleware initialised"}, TokenApi, KeyApi).addLogger(),
+        path: "/api/user"
+    },
+    {
+        middlewareClass: init(AuthenticationMiddleware, { message: "Authentication middleware initialised"}, DBApi).addLogger(),
         path: "/api/user"
     }
 ]
