@@ -122,8 +122,6 @@ export class User extends Hono{
 
     async getId(c: Context){
         const id = c.get("id");
-        console.log(id)
-        console.log(c.var)
         if (!id) throw new InfrastructureError("Auth middleware failed", 500);
         return id;
     }
