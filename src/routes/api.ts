@@ -54,7 +54,7 @@ export class Api extends Hono{
         const jwt = await this.ExchangeApi.getJWT(code);
 
         setCookie(c, "jwt", jwt);
-        return c.redirect("/profile.html", 303);
+        return c.redirect("/", 303);
     }
 
 }
@@ -91,7 +91,7 @@ export class User extends Hono{
 
     async logout(c: Context) {
         const frontendRedirect = c.req.query("redirect_url");
-        const finalTarget = frontendRedirect || "http://127.0.0.1:8080/profile.html";
+        const finalTarget = frontendRedirect || "http://127.0.0.1:8080/";
 
         deleteCookie(c, 'jwt', { path: '/' });
 
