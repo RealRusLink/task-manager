@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager - Dashboard</title>
+    <title>TM HOME | Secure Portal</title>
     <style>
         :root {
             --primary: #4f46e5;
             --primary-hover: #4338ca;
+            --success: #10b981;
             --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --glass: rgba(255, 255, 255, 0.95);
+            --glass: rgba(255, 255, 255, 0.85);
             --text-main: #1f2937;
             --text-muted: #6b7280;
+            --error: #ef4444;
+            --border: rgba(255, 255, 255, 0.4);
         }
 
         body {
@@ -22,169 +25,399 @@
             margin: 0;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
             color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .hidden { display: none !important; }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            padding: 1.2rem 3rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .nav-logo {
+            color: white;
+            font-weight: 900;
+            font-size: 1.4rem;
+            text-decoration: none;
+            cursor: pointer;
+            letter-spacing: -1px;
         }
 
         .container {
-            width: 100%;
-            max-width: 480px;
-            padding: 20px;
-            box-sizing: border-box;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
         }
 
         .glass-card {
             background: var(--glass);
-            backdrop-filter: blur(10px);
-            border-radius: 24px;
-            padding: 40px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(25px);
+            border-radius: 32px;
+            padding: 3rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+
+        #page-dashboard .glass-card {
+            max-width: 480px;
             text-align: center;
         }
 
-        .status-tag {
-            display: inline-flex;
-            align-items: center;
-            background: #eef2ff;
-            color: var(--primary);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 24px;
+        .profile-wrapper {
+            width: 100%;
+            max-width: 1150px;
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 2.5rem;
+            align-items: stretch;
         }
 
-        .status-tag::before {
-            content: '';
-            width: 8px;
-            height: 8px;
-            background: var(--primary);
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
+        @media (max-width: 968px) {
+            .profile-wrapper { grid-template-columns: 1fr; }
         }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.7; }
-            70% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.7; }
+        .user-header { text-align: center; }
+
+        .avatar-circle {
+            width: 100px; height: 100px; background: var(--primary); color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; font-weight: 800; margin: 0 auto 2rem;
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
         }
 
-        h1 {
-            font-size: 2rem;
-            font-weight: 800;
-            margin-bottom: 12px;
-            color: #111827;
-            letter-spacing: -0.025em;
+        .username-row { min-height: 130px; display: flex; flex-direction: column; justify-content: center; }
+        .username-text { font-size: 2.2rem; font-weight: 900; letter-spacing: -1.5px; margin: 0; }
+        .username-input {
+            font-size: 2.2rem; font-weight: 900; letter-spacing: -1.5px;
+            background: transparent; border: none; border-bottom: 3px solid var(--primary);
+            outline: none; color: var(--primary); text-align: center; font-family: inherit;
         }
 
-        p {
-            font-size: 1rem;
-            color: var(--text-muted);
-            margin-bottom: 32px;
-            line-height: 1.6;
-        }
-
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
+        .data-list { margin-top: auto; text-align: left; background: rgba(0,0,0,0.04); padding: 1.5rem; border-radius: 20px; }
+        .data-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
+        .data-value { display: block; font-weight: 600; font-size: 1.1rem; margin-top: 4px; }
 
         .btn {
+            padding: 1rem 2rem;
+            border-radius: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            font-size: 1rem;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-outline { background: white; color: var(--text-main); border: 1px solid #e5e7eb; }
+        .btn-outline:hover:not(:disabled) { border-color: var(--primary); background: #f9fafb; }
+
+        .btn-outline:disabled {
+            background: #f3f4f6;
+            color: var(--success);
+            border-color: #d1d5db;
+            cursor: default;
+        }
+
+        .btn-ghost { background: transparent; color: white; }
+        .btn-danger-link { color: var(--error); font-size: 0.85rem; margin-top: 1.5rem; font-weight: 700; background: none; }
+
+        .idp-card {
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 22px;
+            padding: 1.4rem;
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 14px 24px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
+            gap: 1.2rem;
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+        .idp-icon { width: 44px; height: 44px; background: var(--primary); color: white; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(12px);
+            display: flex; justify-content: center; align-items: center; z-index: 3000;
         }
 
-        .btn-auth {
-            background-color: var(--primary);
-            color: white;
-            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
-        }
-
-        .btn-auth:hover {
-            background-color: var(--primary-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
-        }
-
-        .btn-profile {
-            background-color: #f9fafb;
-            color: var(--text-main);
-            border: 1px solid #e5e7eb;
-        }
-
-        .btn-profile:hover {
-            background-color: #f3f4f6;
-            border-color: #d1d5db;
-            transform: translateY(-2px);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .footer-note {
-            margin-top: 24px;
-            font-size: 0.75rem;
-            color: var(--text-muted);
+        .reauth-banner {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: #1f2937; color: white; padding: 1.2rem 2.5rem;
+            border-radius: 16px; display: flex; align-items: center; gap: 2rem; z-index: 2000;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="glass-card">
-        <div class="status-tag">Development Hub</div>
-        <h1>Task Manager</h1>
-        <p>Access the core resource server using our secure Central Identity Provider.</p>
+<nav class="navbar">
+    <div id="navBranding" class="nav-logo" onclick="navigateTo('dashboard')">TM HOME</div>
+    <div style="display: flex; gap: 1rem;">
+        <button onclick="navigateTo('dashboard')" class="btn btn-ghost">Home</button>
+        <button onclick="navigateTo('profile')" class="btn btn-ghost" style="border: 1px solid rgba(255,255,255,0.2); border-radius: 12px;">Profile</button>
+    </div>
+</nav>
 
-        <div class="controls">
-            <button id="authTrigger" class="btn btn-auth">
-                Authenticate via IDP
-            </button>
+<div id="reauthBanner" class="reauth-banner hidden">
+    <span style="font-weight: 600;">Session expired. Re-authentication required.</span>
+    <button onclick="startIdpAuth(true)" class="btn btn-primary" style="padding: 0.6rem 1.2rem;">Authenticate</button>
+</div>
 
-            <a href="/profile.html" class="btn btn-profile">
-                Go to Profile
-            </a>
-        </div>
-
-        <div class="footer-note">
-            Resource Server v1.0.4-dev
-        </div>
+<div id="deleteModal" class="modal-overlay hidden">
+    <div class="glass-card" style="text-align: center; max-width: 450px;">
+        <h2 style="color:var(--error); font-weight:900;">DELETE ACCOUNT</h2>
+        <p>This action will permanently remove your data from the resource server.</p>
+        <button id="confirmDeleteBtn" onclick="executeDeletion()" class="btn btn-primary" style="background:var(--error); width: 100%;" disabled>
+            Wait <span id="timer">10</span>s
+        </button>
+        <button onclick="closeDeleteModal()" class="btn btn-outline" style="width: 100%; margin-top: 12px;">Cancel</button>
     </div>
 </div>
 
+<div class="container">
+
+    <section id="page-dashboard" class="page">
+        <div class="glass-card">
+            <h1 style="font-size: 2.6rem; margin: 0 0 1rem 0; letter-spacing: -2px;">Main Page</h1>
+            <p id="authStatusText" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 2.5rem; font-weight: 500;">Checking session status...</p>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button id="dashGoProfile" onclick="navigateTo('profile')" class="btn btn-primary">Go to Profile</button>
+                <button id="dashStartAuth" onclick="startIdpAuth()" class="btn btn-outline">Authentication</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="page-auth-required" class="page hidden">
+        <div class="glass-card" style="text-align: center; max-width: 500px;">
+            <div class="avatar-circle" style="background: #f3f4f6; color: #9ca3af; box-shadow: none;">!</div>
+            <h1>Access Restricted</h1>
+            <p style="margin-bottom: 2rem;">Secure authentication is required to manage your profile.</p>
+            <button onclick="startIdpAuth()" class="btn btn-primary">Authenticate Now</button>
+        </div>
+    </section>
+
+    <section id="page-profile" class="page hidden">
+        <div class="profile-wrapper">
+            <div class="glass-card user-header">
+                <div class="avatar-circle" id="avatarLetter">?</div>
+                <div class="username-row">
+                    <div id="nameView">
+                        <h1 id="userNameDisplay" class="username-text">-</h1>
+                        <button onclick="toggleEdit(true)" class="btn btn-ghost" style="margin-top: 12px; font-weight: 800; color: var(--primary);">Edit Username</button>
+                    </div>
+                    <div id="nameEdit" class="hidden">
+                        <input type="text" id="usernameInput" class="username-input">
+                        <div id="usernameError" style="color: var(--error); font-size: 0.75rem; margin-top: 8px; font-weight: 800;"></div>
+                        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 15px;">
+                            <button onclick="submitUsername()" class="btn btn-primary" style="padding: 0.6rem 1.5rem;">Save</button>
+                            <button onclick="toggleEdit(false)" class="btn btn-ghost" style="color: var(--text-muted);">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="data-list">
+                    <div class="data-item">
+                        <span class="data-label">Registration Date</span>
+                        <span id="userCreated" class="data-value">-</span>
+                    </div>
+                </div>
+                <div style="margin-top: 2.5rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1.5rem;">
+                    <button onclick="handleLogout()" class="btn btn-outline" style="width: 100%; color: var(--text-main);">Sign Out</button>
+                    <button onclick="openDeleteModal()" class="btn btn-danger-link">Permanently Delete Account</button>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3 style="margin-top: 0; font-size: 0.8rem; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 900; text-transform: uppercase;">Linked Identities</h3>
+                <div id="identitiesList" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem;"></div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
 <script>
-    const AUTH_PARAMS = {
+    const CONFIG = {
         gate: "http://localhost:443/authenticate",
         callback: window.location.origin + "/api/authenticate",
         auditor: "my_tm"
     };
 
-    const authBtn = document.getElementById('authTrigger');
+    let state = { user: null, identities: [], currentUsername: "" };
 
-    authBtn.addEventListener('click', () => {
-        const searchParams = new URLSearchParams({
-            redirect_url: AUTH_PARAMS.callback,
-            auditor: AUTH_PARAMS.auditor
+    window.addEventListener('DOMContentLoaded', () => {
+        checkSession();
+    });
+
+    async function checkSession() {
+        const statusText = document.getElementById('authStatusText');
+        const btnProfile = document.getElementById('dashGoProfile');
+        const btnAuth = document.getElementById('dashStartAuth');
+
+        try {
+            const res = await fetch('/api/user');
+            if (res.ok) {
+                const data = await res.json();
+                state.user = data.user;
+                state.currentUsername = data.user.username;
+
+                statusText.innerHTML = `Welcome back, <span style="color: var(--primary); font-weight: 800;">${state.currentUsername}</span>. You are currently authenticated.`;
+                btnAuth.disabled = true;
+                btnAuth.innerHTML = "Authenticated ✓";
+                btnProfile.disabled = false;
+                btnProfile.style.opacity = "1";
+            } else {
+                statusText.innerText = "You are not authenticated. Please enter via our secure provider.";
+                btnAuth.disabled = false;
+                btnAuth.innerText = "Authentication";
+                btnProfile.disabled = true;
+                btnProfile.style.opacity = "0.5";
+            }
+        } catch (e) {
+            statusText.innerText = "Connection error.";
+        }
+    }
+
+    function navigateTo(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+        const branding = document.getElementById('navBranding');
+
+        if (pageId === 'profile') {
+            branding.innerText = "TM PROFILE";
+            fetchProfileData();
+        } else {
+            branding.innerText = "TM HOME";
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+            if (pageId === 'dashboard') checkSession();
+        }
+    }
+
+    async function fetchProfileData() {
+        try {
+            const res = await fetch('/api/user');
+            if (res.ok) {
+                const data = await res.json();
+                state.user = data.user;
+                state.identities = data.identities;
+                state.currentUsername = data.user.username;
+                document.getElementById('page-profile').classList.remove('hidden');
+                renderProfile();
+            } else {
+                document.getElementById('page-auth-required').classList.remove('hidden');
+            }
+        } catch (e) {
+            document.getElementById('page-auth-required').classList.remove('hidden');
+        }
+    }
+
+    function renderProfile() {
+        document.getElementById('userNameDisplay').innerText = state.currentUsername;
+        document.getElementById('avatarLetter').innerText = state.currentUsername[0].toUpperCase();
+        document.getElementById('userCreated').innerText = new Date(state.user.created).toLocaleDateString('en-US', {
+            day: 'numeric', month: 'long', year: 'numeric'
         });
 
-        const finalUrl = `${AUTH_PARAMS.gate}?${searchParams.toString()}`;
-        window.location.href = finalUrl;
+        document.getElementById('identitiesList').innerHTML = (state.identities || []).map(i => `
+            <div class="idp-card">
+                <div class="idp-icon">${i.idp[0].toUpperCase()}</div>
+                <div>
+                    <div style="font-weight:900; font-size:1rem;">${i.idp.toUpperCase()}</div>
+                    <div style="color:var(--text-muted); font-size:0.85rem; font-weight: 500;">${i.username}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function toggleEdit(show) {
+        document.getElementById('nameView').classList.toggle('hidden', show);
+        document.getElementById('nameEdit').classList.toggle('hidden', !show);
+        if (show) {
+            const input = document.getElementById('usernameInput');
+            input.value = state.currentUsername;
+            input.style.width = (state.currentUsername.length + 2) + "ch";
+            input.focus();
+            document.getElementById('usernameError').innerText = "";
+        }
+    }
+
+    async function submitUsername() {
+        const val = document.getElementById('usernameInput').value.trim();
+        if (val === state.currentUsername) return toggleEdit(false);
+
+        const res = await fetch('/api/user/protected/username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: val })
+        });
+
+        if (res.status === 403) {
+            document.getElementById('reauthBanner').classList.remove('hidden');
+        } else if (res.ok) {
+            await fetchProfileData();
+            toggleEdit(false);
+        } else {
+            document.getElementById('usernameError').innerText = await res.text();
+        }
+    }
+
+    let deleteInterval;
+    function openDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('hidden');
+        let sec = 10;
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true;
+        deleteInterval = setInterval(() => {
+            sec--;
+            document.getElementById('timer').innerText = sec;
+            if (sec <= 0) {
+                clearInterval(deleteInterval);
+                btn.disabled = false;
+                btn.innerText = "CONFIRM DELETION";
+            }
+        }, 1000);
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+        clearInterval(deleteInterval);
+    }
+
+    async function executeDeletion() {
+        const res = await fetch('/api/user/protected/delete', { method: 'POST' });
+        if (res.status === 403) {
+            closeDeleteModal();
+            document.getElementById('reauthBanner').classList.remove('hidden');
+        } else if (res.ok) {
+            location.reload();
+        }
+    }
+
+    function startIdpAuth(force = false) {
+        const p = new URLSearchParams({ redirect_url: CONFIG.callback, auditor: CONFIG.auditor });
+        if (force) p.append('prompt', 'login');
+        window.location.href = `${CONFIG.gate}?${p.toString()}`;
+    }
+
+    function handleLogout() {
+        window.location.href = `/api/user/logout?redirect_url=${encodeURIComponent(window.location.origin)}`;
+    }
+
+    document.getElementById('usernameInput').addEventListener('input', function() {
+        this.style.width = (this.value.length + 2) + "ch";
     });
 </script>
 </body>

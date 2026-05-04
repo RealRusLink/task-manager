@@ -143,6 +143,28 @@ export class DBAdapter {
     }
 
 
+    async deleteUser(internalId: string): Promise<boolean> {
+        const client = await this.connection.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query(
+                `DELETE FROM "${this.config.db.tables.userIdentities}" WHERE internal_user_id = $1`,
+                [internalId]
+            );
+            const res = await client.query(
+                `DELETE FROM "${this.config.db.tables.users}" WHERE id = $1`,
+                [internalId]
+            );
+            await client.query('COMMIT');
+            return (res.rowCount ?? 0) > 0;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async updateUsername(id: string, newUsername: string): Promise<string | null> {
         const query = `
             UPDATE ${this.config.db.tables.users}

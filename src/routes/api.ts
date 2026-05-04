@@ -83,6 +83,7 @@ export class User extends Hono{
         this.get("/", (c) => this.getUser(c))
         this.get("/username", (c) => this.getUsername(c))
         this.post("/protected/username", (c) => this.changeUsername(c))
+        this.post("/protected/delete", (c) => this.deleteAccount(c))
         this.get("/logout", (c) => this.logout(c))
     }
 
@@ -162,6 +163,19 @@ export class User extends Hono{
             throw new BusinessError("Update failed: User not found", 404);
         }
         return c.json({ success: true , username: newUsername});
+    }
+
+
+    async deleteAccount(c: Context) {
+        const id = await this.getId(c);
+
+        const isDeleted = await this.DBApi.deleteUser(id);
+
+        if (!isDeleted) {
+            throw new BusinessError("Delete failed: User not found", 404);
+        }
+        deleteCookie(c, "jwt");
+        return c.json({ success: true });
     }
 
 }
