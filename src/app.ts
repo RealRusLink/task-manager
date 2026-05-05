@@ -11,12 +11,14 @@ import {
     AllowRedirectMiddleware,
     JWTVerificationMiddleware,
     errorHandler,
-    LoggerMiddleware, AuthenticationMiddleware, FreshnessGuardMiddleware
+    LoggerMiddleware, AuthenticationMiddleware, FreshnessGuardMiddleware, AuthorizationMiddleware
 } from "./routes/middleware.js";
 import {TokenManager} from "./crypto/token.js";
 import {BusinessError} from "./errors/types.js";
 import {KeyFetcher} from "./back2back/key.js";
 import {ExchangeFetcher} from "./back2back/exchange.js";
+import {Tasks} from "./routes/tasks.js";
+import {DBTasksAdapter} from "./db/tasks_adapter.js";
 
 /**
  * A Proxy-based builder that does component decoration.
@@ -134,11 +136,17 @@ const KeyApi = init(KeyFetcher, {message: "Key fetcher initialised", logRule: sa
 
 const ExchangeApi = init(ExchangeFetcher, {message: "Exchange fetcher initialised", logRule: safeLogLevel}, GlobalConfig).addLogger()
 
+const DBTasksApi = init(DBTasksAdapter, {message: "Exchange fetcher initialised", logRule: safeLogLevel}, DBConnection, GlobalConfig).addTranslator(DBErrorTranslator).addLogger();
+
 // Declare sub-routers for API and Web domains.
 const routersDeclaration: RoutersDeclaration = [
     {
         router: init(Api, { message: "Api routes initialised" }, DBApi, GlobalConfig, ExchangeApi).addLogger(),
         path: "/api"
+    },
+    {
+        router: init(Tasks, { message: "Tasks routes initialised" }, DBApi, DBTasksApi, GlobalConfig).addLogger(),
+        path: "/api/tasks"
     },
     {
         router: init(User, { message: "User api routes initialised" }, DBApi, GlobalConfig, ExchangeApi).addLogger(),
@@ -149,6 +157,9 @@ const routersDeclaration: RoutersDeclaration = [
         path: "/"
     }
 ];
+
+const JWTVerifier = init(JWTVerificationMiddleware, { message: "JWT verification middleware initialised"}, TokenApi, KeyApi).addLogger();
+const Authenticator = init(AuthenticationMiddleware, { message: "Authentication middleware initialised"}, DBApi).addLogger();
 
 // Register global middlewares.
 const middlewareDeclaration: MiddlewareDeclaration = [
@@ -161,16 +172,29 @@ const middlewareDeclaration: MiddlewareDeclaration = [
         path: "*",
     },
     {
-        middlewareClass: init(JWTVerificationMiddleware, { message: "Authentication middleware initialised"}, TokenApi, KeyApi).addLogger(),
+        middlewareClass: JWTVerifier,
         path: "/api/user/*"
     },
     {
-        middlewareClass: init(AuthenticationMiddleware, { message: "Authentication middleware initialised"}, DBApi).addLogger(),
+        middlewareClass: Authenticator,
         path: "/api/user/*"
     },
+
     {
         middlewareClass: init(FreshnessGuardMiddleware, { message: "Freshness protection middleware initialised"}, GlobalConfig).addLogger(),
         path: "/api/user/protected/*"
+    },
+    {
+        middlewareClass: JWTVerifier,
+        path: "/api/tasks/*"
+    },
+    {
+        middlewareClass: Authenticator,
+        path: "/api/tasks/*"
+    },
+    {
+        middlewareClass: init(AuthorizationMiddleware, { message: "Authorization middleware initialised"}, DBApi, DBTasksApi).addLogger(),
+        path: "/api/tasks/*"
     }
 ]
 
