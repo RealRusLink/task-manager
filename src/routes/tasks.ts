@@ -123,9 +123,7 @@ export class Tasks extends Hono{
 
     async createTask(c: Context){
         const data = this.#getData(c);
-        console.log(data)
         const payloadTry = TaskPayloadSchema.safeParse(data.json);
-        console.log(payloadTry.error);
         if (!payloadTry.success) throw new BusinessError();
         const payload = payloadTry.data;
         const createdTask = await this.DBTasksApi.createTask(payload, data.id);
