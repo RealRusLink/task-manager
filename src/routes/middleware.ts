@@ -1,4 +1,4 @@
-import {type Context, type MiddlewareHandler, type Next} from "hono";
+import {type Context, Hono, type MiddlewareHandler, type Next} from "hono";
 import  { getCookie } from "hono/cookie"
 import {type LoggerService} from "logger/dist/index.js"
 import {AppError, BusinessError, InfrastructureError} from "../errors/types.js";
@@ -6,6 +6,9 @@ import {type JWTPayload, TokenManager} from "../crypto/token.js";
 import type {KeyFetcher} from "../back2back/key.js";
 import type {DBAdapter} from "../db/adapter.js";
 import type {Config} from "../config.js";
+import type {DBTasksAdapter} from "../db/tasks_adapter.js";
+import type {arrayOutputType} from "zod/v3";
+import z from "zod"
 /**
  * Base abstract class for creating Hono middleware.
  * Exposes a standardized handler that bridges Hono's middleware interface with the internal execute logic.
@@ -161,6 +164,86 @@ export class FreshnessGuardMiddleware extends Middleware {
         if (tokenAgeSeconds > maxAgeSeconds) {
             throw new BusinessError("Session expired", 403);
         }
+
+        await next();
+    }
+}
+
+async function safeJSON(c: Context){
+    try {
+        let result = await c.req.json() as object;
+        return result;
+    } catch (e){
+        return {};
+    }
+}
+
+
+
+export class AuthorizationMiddleware extends Middleware {
+    DBApi: DBAdapter;
+    DBTasksApi: DBTasksAdapter;
+
+    constructor(DBApi: DBAdapter, DBTasksApi: DBTasksAdapter) {
+        super();
+        this.DBApi = DBApi;
+        this.DBTasksApi = DBTasksApi;
+    }
+
+    #getIDs(subject: any, result: Array<string>): Array<string> {
+        if (!subject || typeof subject !== 'object') return result;
+
+        for (const key in subject) {
+            const value = subject[key];
+
+            if (this.DBTasksApi.TASK_ID_FIELDS.includes(key)) {
+                if (Array.isArray(value)) {
+                    result.push(...value.map(String));
+                } else if (value !== null && value !== undefined) {
+                    if (typeof value === 'string') {
+                        result.push(value);
+                    }
+                }
+            }
+            if (value !== null && typeof value === "object") {
+                this.#getIDs(value, result);
+            }
+        }
+        return result;
+    }
+
+    execute = async (c: Context, next: () => Promise<void>) => {
+        const json = await safeJSON(c) || {};
+        const query = c.req.query();
+
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+        const idsFromPath = c.req.path.match(uuidRegex) || [];
+
+        const otherIds = this.#getIDs({ ...json, ...query }, []);
+        const combinedIds = [...idsFromPath, ...otherIds];
+        const uniqueIds = [...new Set(combinedIds.filter(id => id && id !== 'undefined'))];
+        if (uniqueIds.length === 0) {
+            c.set("json", json);
+            c.set("query", query);
+            return await next();
+        }
+
+        const userId = c.get("id");
+        if (!userId) {
+            throw new InfrastructureError("Authentication middleware failed");
+        }
+        const validation = z.array(z.string().uuid()).safeParse(uniqueIds);
+        if (!validation.success) {
+            throw new BusinessError("Invalid Task ID format", 400);
+        }
+        const isAuthorized = await this.DBTasksApi.belongsToAuthor(uniqueIds, userId);
+        if (!isAuthorized) {
+            throw new BusinessError("Forbidden", 403);
+        }
+
+        c.set("json", json);
+        c.set("query", query);
+        c.set("task_id", uniqueIds[0]);
 
         await next();
     }
