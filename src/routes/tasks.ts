@@ -104,7 +104,36 @@ export class Tasks extends Hono{
         const tasks = await this.DBTasksApi.getTree(data.id, !!archived);
         return c.json({ tasks }, 200);
     }
+
     async getTasksSearch(c: Context){
+        const searchTasksSchema = z.object({
+            q: z.string().optional(),
+            category: z.string().optional(),
+            status: TaskStatusSchema.optional(),
+            parent_id: z.preprocess((val) => val === "null" ? null : val, z.uuid().nullable()).optional(),
+            archived: z.preprocess((val) => val === "true", z.boolean()).optional()
+        }).strict()
+        .transform((val) => {
+            return Object.fromEntries(
+                Object.entries(val).filter(([_, v]) => v !== undefined)
+            );
+        });
+
+        const validateFilters = (data: unknown) => {
+            const result = searchTasksSchema.safeParse(data);
+
+            if (!result.success) {
+                console.log(result.error)
+                throw new BusinessError();
+            }
+
+            return result.data;
+        };
+        const data = this.#getData(c);
+        const search = validateFilters(data.query);
+        console.log(search)
+        const searchResult = await this.DBTasksApi.searchTasks(data.id, search);
+        return c.json({tasks: searchResult});
 
     }
 
