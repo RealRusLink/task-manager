@@ -204,7 +204,12 @@ export class Tasks extends Hono{
     }
 
     async changeTask(c: Context){
-
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError();
+        const partialTry = TaskUpdateSchema.safeParse(data.json);
+        if (!partialTry.success) throw new BusinessError();
+        const task = await this.DBTasksApi.updateTask(data.task_id, data.id, partialTry.data as Partial<taskPayload>);
+        return c.json({task}, 201)
     }
 
     async rearrangeTasks(c: Context){
