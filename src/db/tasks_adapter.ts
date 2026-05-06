@@ -1,6 +1,6 @@
 import { type DBConnector } from "./config.js";
 import { type Config } from "../config.js";
-import {InfrastructureError} from "../errors/types.js";
+import {BusinessError, InfrastructureError} from "../errors/types.js";
 
 type taskStatus = "Untouched" | "WIP" | "Done";
 
@@ -29,7 +29,7 @@ interface taskPayload {
     deadline: Date | null;
 }
 
-interface taskFull extends taskMeta, taskPayload {}
+export interface taskFull extends taskMeta, taskPayload {}
 
 export class DBTasksAdapter {
     connection: DBConnector;
@@ -138,10 +138,16 @@ export class DBTasksAdapter {
                 query += ` AND status = $${i++}`;
                 params.push(filters.status);
             }
-            if (filters.parent_id) {
-                query += ` AND parent_id = $${i++}`;
-                params.push(filters.parent_id);
+
+            if (Object.hasOwn(filters, 'parent_id')) {
+                if (filters.parent_id === null) {
+                    query += ` AND parent_id IS NULL`;
+                } else {
+                    query += ` AND parent_id = $${i++}`;
+                    params.push(filters.parent_id);
+                }
             }
+
             if (filters.q) {
                 query += ` AND (name ILIKE $${i} OR content ILIKE $${i})`;
                 params.push(`%${filters.q}%`);
@@ -231,7 +237,12 @@ export class DBTasksAdapter {
             );
 
             const existingIds = new Set(existing.rows.map((r: any) => r.task_id));
-            if (!orderedIds.every(id => existingIds.has(id))) throw new Error();
+            if (orderedIds.length !== existingIds.size) {
+                throw new BusinessError("The provided task list does not exactly match the existing tasks for this parent");
+            }
+            if (!orderedIds.every(id => existingIds.has(id))) {
+                throw new BusinessError("The provided task list does not exactly match the existing tasks for this parent");
+            }
 
             await client.query(
                 `UPDATE tasks SET next = NULL WHERE author_id = $1 AND parent_id IS NOT DISTINCT FROM $2`,
@@ -248,7 +259,7 @@ export class DBTasksAdapter {
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');
-            throw new InfrastructureError("Failed to rearrange tasks", 500);
+            throw e;
         } finally {
             client.release();
         }

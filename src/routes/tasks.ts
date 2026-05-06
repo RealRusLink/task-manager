@@ -4,7 +4,7 @@ import type {Config} from "../config.js";
 import {BusinessError, InfrastructureError} from "../errors/types.js";
 import z from "zod"
 import {deleteCookie, setCookie} from "hono/cookie";
-import type {DBTasksAdapter} from "../db/tasks_adapter.js";
+import type {DBTasksAdapter, taskFull} from "../db/tasks_adapter.js";
 
 /**
  * API router class that extends Hono to provide specialized endpoints for user secrets.
@@ -78,11 +78,48 @@ export class Tasks extends Hono{
         if (!id) throw new InfrastructureError("Auth middleware failed");
         const json = c.get("json") as object | undefined;
         const query = c.get("query") as object | undefined;
-        const task_id = c.get("task_id") as string | undefined;
+        const task_id = c.get("task_id") as string | undefined | null;
         return {
             id, query, task_id, json
         }
     }
+
+
+
+   sortTasksInSequence(tasks: taskFull[]): taskFull[] {
+        if (tasks.length === 0) return [];
+
+        const taskMap = new Map<string, taskFull>();
+        const hasIncoming = new Set<string>();
+        for (const task of tasks) {
+            taskMap.set(task.task_id, task);
+            if (task.next) {
+                hasIncoming.add(task.next);
+            }
+        }
+        let currentTask = tasks.find(t => !hasIncoming.has(t.task_id));
+        if (!currentTask && tasks.length > 0) {
+            currentTask = tasks[0];
+        }
+        const result: taskFull[] = [];
+        const visited = new Set<string>();
+        while (currentTask) {
+            if (visited.has(currentTask.task_id)) break;
+            result.push(currentTask);
+            visited.add(currentTask.task_id);
+            if (currentTask.next) {
+                currentTask = taskMap.get(currentTask.next);
+            } else {
+                currentTask = undefined;
+            }
+        }
+        if (result.length < tasks.length) {
+            const remaining = tasks.filter(t => !visited.has(t.task_id));
+            result.push(...remaining);
+        }
+        return result;
+    }
+
 
 
     async getHighLevelTasks(c: Context){
@@ -92,7 +129,7 @@ export class Tasks extends Hono{
         });
         const { archived } = querySchema.parse(data.query || {});
         const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: null, archived: !!archived})
-        return c.json({tasks}, 200);
+        return c.json({tasks: this.sortTasksInSequence(tasks)}, 200);
     }
 
     async getTasksTree(c: Context) {
@@ -146,7 +183,14 @@ export class Tasks extends Hono{
     }
 
     async getTaskChildren(c: Context){
-
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError();
+        const querySchema = z.object({
+            archived: z.preprocess((val) => val === 'true', z.boolean()).optional()
+        });
+        const { archived } = querySchema.parse(data.query || {});
+        const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: data.task_id, archived: !!archived})
+        return c.json({tasks: this.sortTasksInSequence(tasks)}, 200);
     }
 
 
@@ -164,7 +208,19 @@ export class Tasks extends Hono{
     }
 
     async rearrangeTasks(c: Context){
+        const data = this.#getData(c);
+        if (!data.task_id) data.task_id = null;
+        const jsonSchema = z.object(
+            {
+             order: z.array(z.uuid()),
+             parent_id: z.preprocess(val => val === "null" ? null : val, z.uuid().nullable())
+            });
+        const orderTry = jsonSchema.safeParse(data.json);
+        if (!orderTry.success) throw new BusinessError();
 
+        await this.DBTasksApi.rearrangeTasks(data.id, orderTry.data.parent_id, orderTry.data.order);
+
+        return c.json({message: "Success"}, 200);
     }
 
     async moveTask(c: Context){
