@@ -221,7 +221,7 @@ export class AuthorizationMiddleware extends Middleware {
 
         const otherIds = this.#getIDs({ ...json, ...query }, []);
         const combinedIds = [...idsFromPath, ...otherIds];
-        const uniqueIds = [...new Set(combinedIds.filter(id => id && id !== 'undefined'))];
+        let uniqueIds = [...new Set(combinedIds.filter(id => id && id !== 'undefined'))];
         if (uniqueIds.length === 0) {
             c.set("json", json);
             c.set("query", query);
@@ -232,10 +232,16 @@ export class AuthorizationMiddleware extends Middleware {
         if (!userId) {
             throw new InfrastructureError("Authentication middleware failed");
         }
-        const validation = z.array(z.string().uuid()).safeParse(uniqueIds);
+        const validation = z.preprocess((val) => {
+            if (Array.isArray(val)) {
+                return val.filter(item => item !== "null" && item != null);
+            }
+            return val;
+        }, z.array(z.string().uuid())).safeParse(uniqueIds);
         if (!validation.success) {
             throw new BusinessError("Invalid Task ID format", 400);
         }
+        uniqueIds = validation.data;
         const isAuthorized = await this.DBTasksApi.belongsToAuthor(uniqueIds, userId);
         if (!isAuthorized) {
             throw new BusinessError("Forbidden", 403);
