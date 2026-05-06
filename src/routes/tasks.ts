@@ -4,7 +4,7 @@ import type {Config} from "../config.js";
 import {BusinessError, InfrastructureError} from "../errors/types.js";
 import z from "zod"
 import {deleteCookie, setCookie} from "hono/cookie";
-import type {DBTasksAdapter, taskFull} from "../db/tasks_adapter.js";
+import type {DBTasksAdapter, taskFull, taskPayload} from "../db/tasks_adapter.js";
 
 /**
  * API router class that extends Hono to provide specialized endpoints for user secrets.
@@ -36,6 +36,12 @@ export const TaskPayloadSchema = z.object({
     status: TaskStatusSchema,
     deadline: z.coerce.date().nullable().default(null),
 });
+
+export const TaskUpdateSchema = TaskPayloadSchema.extend({
+    parent_id: z.uuid().nullable().optional(),
+    next: z.uuid().nullable().optional(),
+    deadline: z.coerce.date().nullable().optional(),
+}).partial();
 
 export const TaskFullSchema = TaskMetaSchema.merge(TaskPayloadSchema);
 

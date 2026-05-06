@@ -8,7 +8,7 @@ type taskStatus = "Untouched" | "WIP" | "Done";
 
 
 
-interface taskMeta {
+export interface taskMeta {
     task_id: string;
     author_id: string;
     is_active: boolean;
@@ -18,7 +18,7 @@ interface taskMeta {
     finish_time: Date | null;
 }
 
-interface taskPayload {
+export interface taskPayload {
     parent_id: string | null;
     next: string | null;
     name: string;
@@ -35,7 +35,7 @@ export class DBTasksAdapter {
     connection: DBConnector;
     config: Config;
     ALLOWED_UPDATE_FIELDS = new Set([
-        "parent_id", "next", "name", "content", "category", "priority", "status", "deadline"
+        "content", "category", "priority", "status", "deadline"
     ]);
     MAX_TREE_DEPTH = 100;
     
@@ -163,8 +163,9 @@ export class DBTasksAdapter {
 
     async updateTask(taskId: string, authorId: string, payload: Partial<taskPayload>): Promise<taskFull> {
         const keys = Object.keys(payload).filter(k => this.ALLOWED_UPDATE_FIELDS.has(k));
+
         if (keys.length === 0) {
-            throw new InfrastructureError("Invalid update request", 500);
+            throw new BusinessError("No valid fields provided for update", 400);
         }
 
         const setClause = keys.map((key, i) => `${key} = $${i + 3}`).join(', ');
@@ -177,9 +178,13 @@ export class DBTasksAdapter {
                 WHERE task_id = $1 AND author_id = $2
                 RETURNING *`, [taskId, authorId, ...values]);
 
-            if (res.rowCount === 0) throw new Error();
+            if (res.rowCount === 0) {
+                throw new BusinessError("Task not found or access denied", 404);
+            }
+
             return res.rows[0];
         } catch (e) {
+            if (e instanceof BusinessError) throw e;
             throw new InfrastructureError("Failed to update task", 500);
         }
     }
@@ -230,20 +235,26 @@ export class DBTasksAdapter {
         const client = await this.connection.pool.connect();
         try {
             await client.query('BEGIN');
-
             const existing = await client.query(
-                `SELECT task_id FROM tasks WHERE author_id = $1 AND parent_id IS NOT DISTINCT FROM $2`,
+                `SELECT task_id, is_active FROM tasks WHERE author_id = $1 AND parent_id IS NOT DISTINCT FROM $2`,
                 [authorId, parentId]
             );
 
-            const existingIds = new Set(existing.rows.map((r: any) => r.task_id));
-            if (orderedIds.length !== existingIds.size) {
+            const taskStatusMap = new Map<string, boolean>(
+                existing.rows.map((r: any) => [r.task_id, r.is_active])
+            );
+            if (orderedIds.length !== taskStatusMap.size) {
                 throw new BusinessError("The provided task list does not exactly match the existing tasks for this parent");
             }
-            if (!orderedIds.every(id => existingIds.has(id))) {
-                throw new BusinessError("The provided task list does not exactly match the existing tasks for this parent");
+            for (const id of orderedIds) {
+                const isActive = taskStatusMap.get(id);
+                if (isActive === undefined) {
+                    throw new BusinessError(`Task ${id} does not belong to this parent`);
+                }
+                if (!isActive) {
+                    throw new BusinessError(`Cannot rearrange inactive task: ${id}`);
+                }
             }
-
             await client.query(
                 `UPDATE tasks SET next = NULL WHERE author_id = $1 AND parent_id IS NOT DISTINCT FROM $2`,
                 [authorId, parentId]
@@ -255,7 +266,6 @@ export class DBTasksAdapter {
                     [orderedIds[i + 1], orderedIds[i], authorId]
                 );
             }
-
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');
@@ -302,6 +312,59 @@ export class DBTasksAdapter {
         }
     }
 
+
+    async restoreTask(taskId: string, authorId: string): Promise<taskFull[]> {
+        const client = await this.connection.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const taskRes = await client.query(
+                `SELECT parent_id FROM tasks WHERE task_id = $1 AND author_id = $2 AND is_active = false`,
+                [taskId, authorId]
+            );
+
+            if (taskRes.rowCount === 0) {
+                throw new BusinessError("Task not found", 404);
+            }
+            const { parent_id } = taskRes.rows[0];
+            const tailRes = await client.query(
+                `SELECT task_id FROM tasks 
+             WHERE author_id = $1 AND parent_id IS NOT DISTINCT FROM $2 
+             AND next IS NULL AND is_active = true AND task_id != $3
+             FOR UPDATE`,
+                [authorId, parent_id, taskId]
+            );
+
+            const restoreRes = await client.query(
+                `WITH RECURSIVE subtree AS (
+                SELECT task_id FROM tasks WHERE task_id = $1 AND author_id = $2
+                UNION ALL
+                SELECT t.task_id FROM tasks t JOIN subtree s ON t.parent_id = s.task_id
+                WHERE t.author_id = $2
+            )
+            UPDATE tasks 
+            SET is_active = true, updated_at = NOW()
+            WHERE task_id IN (SELECT task_id FROM subtree)
+            RETURNING *`,
+                [taskId, authorId]
+            );
+            if (tailRes.rows.length > 0) {
+                await client.query(
+                    `UPDATE tasks SET next = $1 WHERE task_id = $2`,
+                    [taskId, tailRes.rows[0].task_id]
+                );
+            }
+
+            await client.query('COMMIT');
+            return restoreRes.rows;
+        } catch (e) {
+            await client.query('ROLLBACK');
+            if (e instanceof BusinessError) throw e;
+            throw new InfrastructureError("Failed to restore task", 500);
+        } finally {
+            client.release();
+        }
+    }
+
     async belongsToAuthor(taskIds: string[], authorId: string): Promise<boolean> {
         try {
             if (taskIds.length === 0) return true;
@@ -320,15 +383,16 @@ export class DBTasksAdapter {
         try {
             const res = await this.connection.pool.query(`
                 WITH RECURSIVE subtree AS (
-                    SELECT task_id FROM tasks WHERE task_id = $1 AND author_id = $2
+                    SELECT task_id FROM tasks WHERE task_id = $1 AND author_id = $2 AND is_active = false
                     UNION ALL
                     SELECT t.task_id FROM tasks t JOIN subtree s ON t.parent_id = s.task_id
                     WHERE t.author_id = $2
                 )
                 DELETE FROM tasks WHERE task_id IN (SELECT task_id FROM subtree)`, [taskId, authorId]);
 
-            if (res.rowCount === 0) throw new Error();
+            if (res.rowCount === 0) throw new BusinessError("Not found", 404);
         } catch (e) {
+            if (e instanceof BusinessError) throw e
             throw new InfrastructureError("Failed to permanently delete task", 500);
         }
     }
