@@ -241,7 +241,10 @@ export class Tasks extends Hono{
     }
 
     async softDeleteTask(c: Context){
-
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError();
+        await this.DBTasksApi.softDeleteTask(data.task_id, data.id);
+        return c.json({message: "Success"}, 200);
     }
 
     async restoreTask(c: Context){
