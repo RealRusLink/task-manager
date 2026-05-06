@@ -49,7 +49,6 @@ export class Api extends Hono{
 
         const code = validationResult.data.code;
 
-        console.log(code)
 
         const jwt = await this.ExchangeApi.getJWT(code);
 
