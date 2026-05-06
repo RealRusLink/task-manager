@@ -248,7 +248,10 @@ export class Tasks extends Hono{
     }
 
     async restoreTask(c: Context){
-
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError();
+        await this.DBTasksApi.restoreTask(data.task_id, data.id);
+        return c.json({message: "Success"}, 200);
     }
 
     async hardDeleteTask(c: Context){
