@@ -71,6 +71,7 @@ export class Tasks extends Hono{
         this.get("/:task_id", (c) => this.getTask(c));
         this.get("/:task_id/children", (c) => this.getTaskChildren(c));
         this.patch("/:task_id", (c) => this.changeTask(c));
+        this.patch("/:task_id/status", (c) => this.switchStatus(c));
         this.post("/rearrange", (c) => this.rearrangeTasks(c));
         this.patch("/:task_id/move", (c) => this.moveTask(c));
         this.delete("/:task_id", (c) => this.softDeleteTask(c));
@@ -217,6 +218,30 @@ export class Tasks extends Hono{
         const task = await this.DBTasksApi.updateTask(data.task_id, data.id, partialTry.data as Partial<taskPayload>);
         return c.json({task}, 201)
     }
+
+
+    async switchStatus(c: Context) {
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError("Task ID is required", 400);
+
+
+        const bodyTry = z.object({ status: TaskStatusSchema }).safeParse(data.json);
+
+        if (!bodyTry.success) {
+            throw new BusinessError(`Invalid status`, 400);
+        }
+
+        const { status } = bodyTry.data;
+
+        const task = await this.DBTasksApi.updateTaskStatus(
+            data.task_id,
+            data.id,
+            status
+        );
+
+        return c.json({ task }, 200);
+    }
+
 
     async rearrangeTasks(c: Context){
         const data = this.#getData(c);

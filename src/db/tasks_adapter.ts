@@ -35,8 +35,7 @@ export class DBTasksAdapter {
     connection: DBConnector;
     config: Config;
     ALLOWED_UPDATE_FIELDS = new Set([
-        "content", "category", "priority", "status", "deadline"
-    ]);
+        "content", "category", "priority", "status", "deadline", "name"    ]);
     MAX_TREE_DEPTH = 100;
     
     TASK_ID_FIELDS = ["parent_id", "next", "task_id", "children", "tasks"];
@@ -116,6 +115,44 @@ export class DBTasksAdapter {
             throw new InfrastructureError("Failed to fetch task by ID", 500);
         }
     }
+
+
+    async updateTaskStatus(taskId: string, authorId: string, status: taskStatus): Promise<taskFull> {
+        try {
+            let query: string;
+            let params: any[] = [status, taskId, authorId];
+            switch (status) {
+                case "WIP":
+                    query = `UPDATE tasks 
+                         SET status = $1, start_time = NOW(), finish_time = NULL 
+                         WHERE task_id = $2 AND author_id = $3 
+                         RETURNING *`;
+                    break;
+                case "Done":
+                    query = `UPDATE tasks 
+                         SET status = $1, 
+                             finish_time = NOW(), 
+                             start_time = COALESCE(start_time, NOW()) 
+                         WHERE task_id = $2 AND author_id = $3 
+                         RETURNING *`;
+                    break;
+                default:
+                    query = `UPDATE tasks 
+                         SET status = $1, start_time = NULL, finish_time = NULL 
+                         WHERE task_id = $2 AND author_id = $3 
+                         RETURNING *`;
+                    break;
+            }
+            const res = await this.connection.pool.query(query, params);
+            if (res.rowCount === 0) throw new BusinessError("Task not found", 404);
+
+            return res.rows[0];
+        } catch (e) {
+            if (e instanceof BusinessError) throw e;
+            throw new InfrastructureError("Failed to update task status", 500);
+        }
+    }
+
 
 
     async searchTasks(authorId: string, filters: {
