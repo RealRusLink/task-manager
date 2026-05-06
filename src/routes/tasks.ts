@@ -229,7 +229,15 @@ export class Tasks extends Hono{
     }
 
     async moveTask(c: Context){
-
+        const data = this.#getData(c);
+        if (!data.task_id) throw new BusinessError();
+        const partialTry = z.object({
+            parent_id: z.preprocess(val => val === "null" ? null : val, z.uuid().nullable())
+        }).safeParse(data.json)
+        if (!partialTry.success) throw new BusinessError();
+        if (partialTry.data.parent_id === data.task_id) throw new BusinessError();
+        const task = await this.DBTasksApi.moveTask(data.task_id, data.id, partialTry.data.parent_id);
+        return c.json({task}, 201)
     }
 
     async softDeleteTask(c: Context){
