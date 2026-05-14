@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TM PROFILE</title>
+    <style>
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="index.html">TM PROFILE</a>
+    <a href="index.html">Home</a>
+    <a href="profile.html">Profile</a>
+</nav>
+
+
+<div id="reauthBanner" class="hidden" style="border: 1px solid red; padding: 10px;">
+    <span>Session expired. Re-authentication required.</span>
+    <button onclick="startIdpAuth(true)">Authenticate</button>
+</div>
+
+
+<div id="deleteModal" class="hidden" style="border: 1px solid black; padding: 20px; position: fixed; background: white; top: 20%;">
+    <h2>DELETE ACCOUNT</h2>
+    <p>This action will permanently remove your data from the resource server.</p>
+    <button id="confirmDeleteBtn" onclick="executeDeletion()" disabled>
+        Wait <span id="timer">10</span>s
+    </button>
+    <button onclick="closeDeleteModal()">Cancel</button>
+</div>
+
+
+<section id="page-auth-required" class="hidden">
+    <h1>Access Restricted</h1>
+    <p>Secure authentication is required to manage your profile.</p>
+    <button onclick="startIdpAuth()">Authenticate Now</button>
+</section>
+
+
+<section id="page-profile" class="hidden">
+    <div id="avatarLetter" style="font-size: 2em; border: 1px solid #000; width: 40px; text-align: center;">?</div>
+
+    <div id="nameView">
+        <h1 id="userNameDisplay">-</h1>
+        <button onclick="toggleEdit(true)">Edit Username</button>
+    </div>
+
+    <div id="nameEdit" class="hidden">
+        <input type="text" id="usernameInput">
+        <div id="usernameError" style="color: red;"></div>
+        <button onclick="submitUsername()">Save</button>
+        <button onclick="toggleEdit(false)">Cancel</button>
+    </div>
+
+    <p>
+        <strong>Registration Date:</strong>
+        <span id="userCreated">-</span>
+    </p>
+
+    <hr>
+    <h3>Linked Identities</h3>
+    <div id="identitiesList"></div>
+
+    <hr>
+    <button onclick="handleLogout()">Sign Out</button>
+    <br><br>
+    <button onclick="openDeleteModal()" style="color: red;">Permanently Delete Account</button>
+</section>
+
+<script>
+    const CONFIG = {
+        gate: "http://localhost:443/authenticate",
+        callback: window.location.origin + "/api/authenticate",
+        auditor: "my_tm"
+    };
+
+    let state = { user: null, identities: [], currentUsername: "" };
+
+    window.addEventListener('DOMContentLoaded', () => {
+        fetchProfileData();
+    });
+
+    async function fetchProfileData() {
+        try {
+            const res = await fetch('/api/user/');
+            if (res.ok) {
+                const data = await res.json();
+                state.user = data.user;
+                state.identities = data.identities;
+                state.currentUsername = data.user.username;
+
+                document.getElementById('page-profile').classList.remove('hidden');
+                document.getElementById('page-auth-required').classList.add('hidden');
+                renderProfile();
+            } else {
+                document.getElementById('page-auth-required').classList.remove('hidden');
+                document.getElementById('page-profile').classList.add('hidden');
+            }
+        } catch (e) {
+            document.getElementById('page-auth-required').classList.remove('hidden');
+        }
+    }
+
+    function renderProfile() {
+        document.getElementById('userNameDisplay').innerText = state.currentUsername;
+        document.getElementById('avatarLetter').innerText = state.currentUsername[0].toUpperCase();
+        document.getElementById('userCreated').innerText = new Date(state.user.created).toLocaleDateString();
+
+        document.getElementById('identitiesList').innerHTML = (state.identities || []).map(i => `
+            <div style="border: 1px solid #ccc; margin: 5px; padding: 5px;">
+                <strong>${i.idp.toUpperCase()}</strong>: ${i.username}
+            </div>
+        `).join('');
+    }
+
+    function toggleEdit(show) {
+        document.getElementById('nameView').classList.toggle('hidden', show);
+        document.getElementById('nameEdit').classList.toggle('hidden', !show);
+        if (show) {
+            document.getElementById('usernameInput').value = state.currentUsername;
+            document.getElementById('usernameError').innerText = "";
+        }
+    }
+
+    async function submitUsername() {
+        const val = document.getElementById('usernameInput').value.trim();
+        if (val === state.currentUsername) return toggleEdit(false);
+
+        const res = await fetch('/api/user/protected/username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: val })
+        });
+
+        if (res.status === 403) {
+            document.getElementById('reauthBanner').classList.remove('hidden');
+        } else if (res.ok) {
+            await fetchProfileData();
+            toggleEdit(false);
+        } else {
+            document.getElementById('usernameError').innerText = await res.text();
+        }
+    }
+
+    let deleteInterval;
+    function openDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('hidden');
+        let sec = 10;
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true;
+        btn.innerText = `Wait ${sec}s`;
+
+        deleteInterval = setInterval(() => {
+            sec--;
+            document.getElementById('timer').innerText = sec;
+            if (sec <= 0) {
+                clearInterval(deleteInterval);
+                btn.disabled = false;
+                btn.innerText = "CONFIRM DELETION";
+            }
+        }, 1000);
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+        clearInterval(deleteInterval);
+    }
+
+    async function executeDeletion() {
+        const res = await fetch('/api/user/protected/delete', { method: 'POST' });
+        if (res.status === 403) {
+            closeDeleteModal();
+            document.getElementById('reauthBanner').classList.remove('hidden');
+        } else if (res.ok) {
+            location.href = 'index.html';
+        }
+    }
+
+    function startIdpAuth(force = false) {
+        const p = new URLSearchParams({ redirect_url: CONFIG.callback, auditor: CONFIG.auditor });
+        if (force) p.append('prompt', 'login');
+        window.location.href = `${CONFIG.gate}?${p.toString()}`;
+    }
+
+    function handleLogout() {
+        window.location.href = `/api/user/logout?redirect_url=${encodeURIComponent(window.location.origin)}`;
+    }
+</script>
+</body>
+</html>
