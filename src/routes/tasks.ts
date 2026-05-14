@@ -4,7 +4,7 @@ import type {Config} from "../config.js";
 import {BusinessError, InfrastructureError} from "../errors/types.js";
 import z from "zod"
 import {deleteCookie, setCookie} from "hono/cookie";
-import type {DBTasksAdapter, taskFull, taskPayload} from "../db/tasks_adapter.js";
+import type {DBTasksAdapter, taskFull, taskPayload, taskStatus} from "../db/tasks_adapter.js";
 
 /**
  * API router class that extends Hono to provide specialized endpoints for user secrets.
@@ -26,22 +26,41 @@ export const TaskMetaSchema = z.object({
     finish_time: z.coerce.date().nullable().default(null),
 });
 
-export const TaskPayloadSchema = z.object({
-    parent_id: z.uuid().nullable().default(null),
-    next: z.uuid().nullable().default(null),
+
+export const TaskContentSchema = z.object({
     name: z.string(),
     content: z.string(),
     category: z.string(),
     priority: z.number(),
-    status: TaskStatusSchema,
     deadline: z.coerce.date().nullable().default(null),
 });
 
-export const TaskUpdateSchema = TaskPayloadSchema.extend({
+
+export const TaskAdditionalSchema = z.object({
+    parent_id: z.uuid().nullable().default(null),
+    next: z.uuid().nullable().default(null),
+    status: TaskStatusSchema
+})
+
+
+export const TaskPayloadSchema = TaskContentSchema.merge(TaskAdditionalSchema);
+
+const removeUndefined = <T extends Record<string, any>>(obj: T): T => {
+    return Object.fromEntries(
+        Object.entries(obj).filter(([_, value]) => value !== undefined)
+    ) as T;
+};
+
+
+export const TaskUpdateSchema = TaskContentSchema.extend({
+    deadline: z.coerce.date().nullable().optional()
+}).partial()
+  .transform(removeUndefined);
+
+export const TaskAdditionalUpdateSchema = TaskAdditionalSchema.extend({
     parent_id: z.uuid().nullable().optional(),
     next: z.uuid().nullable().optional(),
-    deadline: z.coerce.date().nullable().optional(),
-}).partial();
+}).partial().transform(removeUndefined);
 
 export const TaskFullSchema = TaskMetaSchema.merge(TaskPayloadSchema);
 
@@ -64,18 +83,13 @@ export class Tasks extends Hono{
      * Registers specific HTTP methods and paths to their corresponding internal handler functions.
      */
     setupRoutes(){
-        this.get("/", (c) => this.getHighLevelTasks(c));
+        this.get("/", (c) => this.getTasksSearch(c));
         this.post("/", (c) => this.createTask(c));
-        this.get("/tree", (c) => this.getTasksTree(c));
-        this.get("/search", (c) => this.getTasksSearch(c));
         this.get("/:task_id", (c) => this.getTask(c));
-        this.get("/:task_id/children", (c) => this.getTaskChildren(c));
+        this.get("/:task_id/", (c) => this.getTaskChildren(c));
         this.patch("/:task_id", (c) => this.changeTask(c));
-        this.patch("/:task_id/status", (c) => this.switchStatus(c));
-        this.post("/rearrange", (c) => this.rearrangeTasks(c));
-        this.patch("/:task_id/move", (c) => this.moveTask(c));
         this.delete("/:task_id", (c) => this.softDeleteTask(c));
-        this.patch("/:task_id/restore", (c) => this.restoreTask(c));
+        this.put("/:task_id", (c) => this.restoreTask(c));
         this.delete("/:task_id/permanent", (c) => this.hardDeleteTask(c));
     }
 
@@ -128,40 +142,26 @@ export class Tasks extends Hono{
     }
 
 
-
-    async getHighLevelTasks(c: Context){
-        const data = this.#getData(c);
-        const querySchema = z.object({
-            archived: z.preprocess((val) => val === 'true', z.boolean()).optional()
-        });
-        const { archived } = querySchema.parse(data.query || {});
-        const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: null, archived: !!archived})
-        return c.json({tasks: this.sortTasksInSequence(tasks)}, 200);
-    }
-
-    async getTasksTree(c: Context) {
-        const data = this.#getData(c);
-        const querySchema = z.object({
-            archived: z.preprocess((val) => val === 'true', z.boolean()).optional()
-        });
-        const { archived } = querySchema.parse(data.query || {});
-        const tasks = await this.DBTasksApi.getTree(data.id, !!archived);
-        return c.json({ tasks }, 200);
-    }
-
-    async getTasksSearch(c: Context){
+    async getTasksSearch(c: Context) {
         const searchTasksSchema = z.object({
             q: z.string().optional(),
             category: z.string().optional(),
             status: TaskStatusSchema.optional(),
-            parent_id: z.preprocess((val) => val === "null" ? null : val, z.uuid().nullable()).optional(),
-            archived: z.preprocess((val) => val === "true", z.boolean()).optional()
-        }).strict()
-        .transform((val) => {
-            return Object.fromEntries(
-                Object.entries(val).filter(([_, v]) => v !== undefined)
-            );
-        });
+            parent_id: z.preprocess(
+                (val) => (val === "null" || val === null ? null : val),
+                z.string().uuid().nullable().optional()
+            ),
+            is_active: z.preprocess(
+                (val) => val === "true" ? true : val === "false" ? false : val,
+                z.boolean().optional()
+            )
+        })
+            .strict()
+            .transform((val) => {
+                return Object.fromEntries(
+                    Object.entries(val).filter(([_, v]) => v !== undefined)
+                );
+            });
 
         const validateFilters = (data: unknown) => {
             const result = searchTasksSchema.safeParse(data);
@@ -173,12 +173,13 @@ export class Tasks extends Hono{
 
             return result.data;
         };
-        const data = this.#getData(c);
-        const search = validateFilters(data.query);
-        console.log(search)
-        const searchResult = await this.DBTasksApi.searchTasks(data.id, search);
-        return c.json({tasks: searchResult});
 
+        const data = this.#getData(c);
+        console.log(data)
+        const search = validateFilters(data.query);
+        const searchResult = await this.DBTasksApi.searchTasks(data.id, search);
+
+        return c.json({ tasks: this.sortTasksInSequence(searchResult) });
     }
 
     async getTask(c: Context){
@@ -192,11 +193,12 @@ export class Tasks extends Hono{
     async getTaskChildren(c: Context){
         const data = this.#getData(c);
         if (!data.task_id) throw new BusinessError();
+        console.log(data)
         const querySchema = z.object({
-            archived: z.preprocess((val) => val === 'true', z.boolean()).optional()
+            is_active: z.preprocess((val) => !(val === "false"), z.boolean().optional().default(true))
         });
-        const { archived } = querySchema.parse(data.query || {});
-        const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: data.task_id, archived: !!archived})
+        const { is_active } = querySchema.parse(data.query || {});
+        const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: data.task_id, is_active: !!is_active})
         return c.json({tasks: this.sortTasksInSequence(tasks)}, 200);
     }
 
@@ -213,63 +215,35 @@ export class Tasks extends Hono{
     async changeTask(c: Context){
         const data = this.#getData(c);
         if (!data.task_id) throw new BusinessError();
-        const partialTry = TaskUpdateSchema.safeParse(data.json);
-        if (!partialTry.success) throw new BusinessError();
-        const task = await this.DBTasksApi.updateTask(data.task_id, data.id, partialTry.data as Partial<taskPayload>);
-        return c.json({task}, 201)
-    }
+        const content = TaskUpdateSchema.safeParse(data.json);
+        if (!content.success) throw new BusinessError();
+        const task = await this.DBTasksApi.updateTask(data.task_id, data.id, content.data as Partial<taskPayload>);
 
+        const additional = TaskAdditionalUpdateSchema.safeParse(data.json);
 
-    async switchStatus(c: Context) {
-        const data = this.#getData(c);
-        if (!data.task_id) throw new BusinessError("Task ID is required", 400);
+        if (!additional.success) throw new BusinessError();
 
-
-        const bodyTry = z.object({ status: TaskStatusSchema }).safeParse(data.json);
-
-        if (!bodyTry.success) {
-            throw new BusinessError(`Invalid status`, 400);
+        let additionalHandlers = {
+            parent_id: async (parent_id: string | null) => await this.DBTasksApi.moveTask(data.task_id as string, data.id, parent_id),
+            next: async (next: string | null) => await this.DBTasksApi.sewTaskOrder(data.task_id as string, data.id, next),
+            status: async (status: taskStatus) => {
+                await this.DBTasksApi.updateTaskStatus(
+                    data.task_id as string,
+                    data.id,
+                    status
+                );
+            },
+        }
+        type k = "parent_id" | "next" | "status";
+        let key: k;
+        for (key in additional.data){
+            await additionalHandlers[key](additional.data[key] as any);
         }
 
-        const { status } = bodyTry.data;
-
-        const task = await this.DBTasksApi.updateTaskStatus(
-            data.task_id,
-            data.id,
-            status
-        );
-
-        return c.json({ task }, 200);
+        return c.json({task: await this.DBTasksApi.getTaskById(data.task_id, data.id)}, 201)
     }
 
 
-    async rearrangeTasks(c: Context){
-        const data = this.#getData(c);
-        if (!data.task_id) data.task_id = null;
-        const jsonSchema = z.object(
-            {
-             order: z.array(z.uuid()),
-             parent_id: z.preprocess(val => val === "null" ? null : val, z.uuid().nullable())
-            });
-        const orderTry = jsonSchema.safeParse(data.json);
-        if (!orderTry.success) throw new BusinessError();
-
-        await this.DBTasksApi.rearrangeTasks(data.id, orderTry.data.parent_id, orderTry.data.order);
-
-        return c.json({message: "Success"}, 200);
-    }
-
-    async moveTask(c: Context){
-        const data = this.#getData(c);
-        if (!data.task_id) throw new BusinessError();
-        const partialTry = z.object({
-            parent_id: z.preprocess(val => val === "null" ? null : val, z.uuid().nullable())
-        }).safeParse(data.json)
-        if (!partialTry.success) throw new BusinessError();
-        if (partialTry.data.parent_id === data.task_id) throw new BusinessError();
-        const task = await this.DBTasksApi.moveTask(data.task_id, data.id, partialTry.data.parent_id);
-        return c.json({task}, 201)
-    }
 
     async softDeleteTask(c: Context){
         const data = this.#getData(c);
@@ -281,6 +255,7 @@ export class Tasks extends Hono{
     async restoreTask(c: Context){
         const data = this.#getData(c);
         if (!data.task_id) throw new BusinessError();
+        if ((await this.DBTasksApi.getTaskById(data.task_id, data.id)))
         await this.DBTasksApi.restoreTask(data.task_id, data.id);
         return c.json({message: "Success"}, 200);
     }
