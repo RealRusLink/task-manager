@@ -146,11 +146,11 @@ const routersDeclaration: RoutersDeclaration = [
     },
     {
         router: init(Tasks, { message: "Tasks routes initialised" }, DBApi, DBTasksApi, GlobalConfig).addLogger(),
-        path: "/api/tasks"
+        path: "/api/tasks/"
     },
     {
         router: init(User, { message: "User api routes initialised" }, DBApi, GlobalConfig, ExchangeApi).addLogger(),
-        path: "/api/user"
+        path: "/api/user/"
     },
     {
         router: init(Web, { message: "Web routes initialised" }, GlobalConfig).addLogger(),
