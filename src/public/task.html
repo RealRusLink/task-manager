@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager</title>
+    <style>
+        body { font-family: system-ui, sans-serif; line-height: 1.5; max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f9; color: #333; }
+        nav { display: flex; gap: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; }
+        nav a { text-decoration: none; color: #4f46e5; font-weight: 600; }
+        .breadcrumb { margin-bottom: 2rem; font-size: 0.9rem; color: #666; }
+        .breadcrumb a { color: #4f46e5; text-decoration: none; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .hidden { display: none !important; }
+
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 6px 0;
+            border-radius: 6px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: white;
+            width: 100px;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .status-untouched { background: #ef4444; }
+        .status-wip { background: #f59e0b; }
+        .status-done { background: #10b981; }
+
+        .children-count {
+            font-size: 0.7rem;
+            background: #e0e7ff;
+            color: #4f46e5;
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            white-space: nowrap;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .time-info { font-size: 0.85rem; color: #666; background: #f9fafb; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #4f46e5; }
+        input, textarea, select { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; font-family: inherit; }
+        textarea { resize: none; }
+
+        button { cursor: pointer; padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #ddd; background: white; font-weight: 600; }
+        .btn-primary { background: #4f46e5; color: white; border: none; }
+
+        .subtask-item {
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .subtask-item.dragging { opacity: 0.4; border: 2px dashed #4f46e5; background: #f0f7ff; }
+        .drag-handle { cursor: grab; color: #ccc; user-select: none; font-size: 1.2rem; line-height: 1; }
+
+        .subtask-link-wrapper { display: flex; align-items: center; flex-grow: 1; min-width: 0; }
+        .subtask-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-archive-icon {
+            background: #f3f4f6;
+            border: none;
+            padding: 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            transition: background 0.2s;
+        }
+        .btn-archive-icon:hover { background: #e5e7eb; color: #374151; }
+
+        .header-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="index.html" style="margin-right: auto; color: #000;">TM tasks</a>
+    <a href="index.html">Home</a>
+    <a href="task.html">Tasks</a>
+    <a href="archive.html">Archive</a>
+</nav>
+
+<div id="pathNav" class="breadcrumb"></div>
+
+<div id="taskView" class="card hidden">
+    <div id="viewMode">
+        <div class="header-row">
+            <h1 id="title" style="margin:0">-</h1>
+            <div id="statusBadgeMain" class="status-badge">-</div>
+        </div>
+        <p id="description" style="white-space: pre-wrap; margin-top: 15px;"></p>
+        <div class="time-info">
+            <div><strong>Deadline:</strong> <span id="viewDeadline">-</span></div>
+            <div id="actualTime" class="hidden">
+                <div><strong>Started:</strong> <span id="viewStart">-</span></div>
+                <div><strong>Finished:</strong> <span id="viewFinish">-</span></div>
+                <div style="margin-top:5px;"><strong>Time spent:</strong> <span id="viewDuration">-</span></div>
+            </div>
+        </div>
+        <button onclick="toggleEdit(true)">Edit Details</button>
+    </div>
+
+    <div id="editMode" class="hidden">
+        <input type="text" id="editName">
+        <textarea id="editContent" rows="4"></textarea>
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1"><input type="date" id="editDeadlineDate"></div>
+            <div style="flex:1"><input type="time" id="editDeadlineTime"></div>
+        </div>
+        <button class="btn-primary" onclick="saveChanges()">Save</button>
+        <button onclick="toggleEdit(false)">Cancel</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3 id="listTitle">Tasks</h3>
+    <div id="subtasksList"></div>
+
+    <div style="margin-top: 20px;">
+        <button id="showCreateBtn" class="btn-primary" onclick="toggleCreateForm(true)">+ Create Task</button>
+
+        <div id="createForm" class="hidden" style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; margin-top: 10px; border: 1px solid #ddd;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="newName" placeholder="Task Name" style="grid-column: span 2;">
+                <textarea id="newContent" placeholder="Content" style="grid-column: span 2; height: 80px;"></textarea>
+                <input type="text" id="newCategory" placeholder="Category" value="general">
+                <input type="number" id="newPriority" placeholder="Priority" value="1">
+                <div style="display: flex; gap: 5px;"><input type="date" id="newDate"><input type="time" id="newTime"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="toggleCreateForm(false)">Cancel</button>
+                    <button class="btn-primary" onclick="createTask()">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const taskId = urlParams.get('id');
+    let currentTask = null;
+    let draggedId = null;
+
+    async function init() {
+        await renderPath();
+        if (taskId) {
+            document.getElementById('taskView').classList.remove('hidden');
+            document.getElementById('listTitle').innerText = "Subtasks";
+            await loadTaskData();
+        } else {
+            document.getElementById('listTitle').innerText = "Tasks";
+            await loadSubtasks();
+        }
+    }
+
+    async function renderPath() {
+        const nav = document.getElementById('pathNav');
+        let html = '<a href="task.html">Root</a>';
+        if (taskId) {
+            try {
+                const res = await fetch(`/api/tasks/${taskId}/path`);
+                const data = await res.json();
+                html = '<a href="task.html">Root</a> / ' + data.path.map((p, i) =>
+                    i === data.path.length - 1 ? `<span>${p.name}</span>` : `<a href="task.html?id=${p.id}">${p.name}</a>`
+                ).join(' / ');
+            } catch (e) {}
+        }
+        nav.innerHTML = html;
+    }
+
+    function getStatusClass(status) {
+        return 'status-' + (status ? status.toLowerCase() : 'untouched');
+    }
+
+    async function advanceStatus(id) {
+        const flow = { "Untouched": "WIP", "WIP": "Done", "Done": "Untouched" };
+        const resTask = await fetch(`/api/tasks/${id}`);
+        const target = await resTask.json();
+        const res = await fetch(`/api/tasks/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: flow[target.status] })
+        });
+        if (res.ok) taskId ? loadTaskData() : loadSubtasks();
+    }
+
+    async function checkAndRenderChildIndicator(parentId) {
+        try {
+            const res = await fetch(`/api/tasks/${parentId}/`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.tasks && data.tasks.length > 0) {
+                    const indicator = document.getElementById(`child-indicator-${parentId}`);
+                    if (indicator) {
+                        indicator.innerText = `subtasks: ${data.tasks.length}`;
+                        indicator.classList.remove('hidden');
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    async function loadTaskData() {
+        const res = await fetch(`/api/tasks/${taskId}`);
+        currentTask = await res.json();
+        document.getElementById('title').innerText = currentTask.name;
+        document.getElementById('description').innerText = currentTask.content || "";
+        const badge = document.getElementById('statusBadgeMain');
+        badge.innerText = currentTask.status;
+        badge.className = 'status-badge ' + getStatusClass(currentTask.status);
+        badge.onclick = () => advanceStatus(taskId);
+
+        const opts = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+        document.getElementById('viewDeadline').innerText = currentTask.deadline ? new Date(currentTask.deadline).toLocaleString('ru-RU', opts) : "Not set";
+
+        if (currentTask.start_time) {
+            document.getElementById('actualTime').classList.remove('hidden');
+            document.getElementById('viewStart').innerText = new Date(currentTask.start_time).toLocaleString('ru-RU', opts);
+            document.getElementById('viewFinish').innerText = currentTask.finish_time ? new Date(currentTask.finish_time).toLocaleString('ru-RU', opts) : "In progress...";
+
+            const end = currentTask.finish_time ? new Date(currentTask.finish_time) : new Date();
+            const diff = end - new Date(currentTask.start_time);
+            document.getElementById('viewDuration').innerText = `${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m`;
+        } else {
+            document.getElementById('actualTime').classList.add('hidden');
+        }
+        await loadSubtasks();
+    }
+
+    async function loadSubtasks() {
+        const url = taskId ? `/api/tasks/${taskId}/` : '/api/tasks/?parent_id=null';
+        const res = await fetch(url);
+        const data = await res.json();
+        renderSubtasks(data.tasks);
+    }
+
+    function renderSubtasks(tasks) {
+        const container = document.getElementById('subtasksList');
+        container.innerHTML = tasks.length ? '' : '<p style="color:#999">Empty.</p>';
+        tasks.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'subtask-item';
+            item.draggable = true;
+            item.dataset.id = t.task_id;
+            item.innerHTML = `
+                <span class="drag-handle">☰</span>
+                <div class="subtask-link-wrapper">
+                    <a class="subtask-link" href="task.html?id=${t.task_id}">${t.name}</a>
+                </div>
+                <span id="child-indicator-${t.task_id}" class="children-count hidden"></span>
+                <div class="status-badge ${getStatusClass(t.status)}" onclick="event.preventDefault(); advanceStatus('${t.task_id}')">${t.status}</div>
+                <button class="btn-archive-icon" onclick="archiveTask('${t.task_id}')" title="Archive">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                </button>
+            `;
+            checkAndRenderChildIndicator(t.task_id);
+            item.addEventListener('dragstart', (e) => { draggedId = t.task_id; item.classList.add('dragging'); });
+            item.addEventListener('dragend', () => item.classList.remove('dragging'));
+            container.appendChild(item);
+        });
+    }
+
+    document.getElementById('subtasksList').addEventListener('dragover', e => {
+        e.preventDefault();
+        const container = document.getElementById('subtasksList');
+        const afterElement = [...container.querySelectorAll('.subtask-item:not(.dragging)')].reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = e.clientY - box.top - box.height / 2;
+            return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+        const dragging = document.querySelector('.dragging');
+        if (afterElement == null) container.appendChild(dragging);
+        else container.insertBefore(dragging, afterElement);
+    });
+
+    document.getElementById('subtasksList').addEventListener('dragend', async (e) => {
+        if (!draggedId) return;
+        const dragging = document.querySelector(`[data-id="${draggedId}"]`);
+        const nextId = dragging.nextElementSibling ? dragging.nextElementSibling.dataset.id : null;
+        await fetch(`/api/tasks/${draggedId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ next: nextId })
+        });
+        taskId ? loadTaskData() : loadSubtasks();
+        draggedId = null;
+    });
+
+    function toggleCreateForm(show) {
+        document.getElementById('createForm').classList.toggle('hidden', !show);
+        document.getElementById('showCreateBtn').classList.toggle('hidden', show);
+    }
+
+    async function createTask() {
+        const d = document.getElementById('newDate').value;
+        const t = document.getElementById('newTime').value;
+        const res = await fetch('/api/tasks/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: document.getElementById('newName').value,
+                content: document.getElementById('newContent').value,
+                category: document.getElementById('newCategory').value,
+                priority: parseInt(document.getElementById('newPriority').value),
+                deadline: d ? new Date(`${d}T${t || '00:00'}`).toISOString() : null,
+                parent_id: taskId, status: "Untouched", next: null
+            })
+        });
+        if (res.ok) { toggleCreateForm(false); taskId ? loadTaskData() : loadSubtasks(); }
+    }
+
+    async function archiveTask(id) {
+        await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+        taskId ? loadTaskData() : loadSubtasks();
+    }
+
+    function toggleEdit(show) {
+        document.getElementById('viewMode').classList.toggle('hidden', show);
+        document.getElementById('editMode').classList.toggle('hidden', !show);
+        if (show) {
+            document.getElementById('editName').value = currentTask.name;
+            document.getElementById('editContent').value = currentTask.content || "";
+            if (currentTask.deadline) {
+                const dt = new Date(currentTask.deadline);
+                document.getElementById('editDeadlineDate').value = dt.toISOString().split('T')[0];
+                document.getElementById('editDeadlineTime').value = dt.toTimeString().slice(0, 5);
+            }
+        }
+    }
+
+    async function saveChanges() {
+        const d = document.getElementById('editDeadlineDate').value;
+        const t = document.getElementById('editDeadlineTime').value;
+        await fetch(`/api/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: document.getElementById('editName').value,
+                content: document.getElementById('editContent').value,
+                deadline: d ? new Date(`${d}T${t || '00:00'}`).toISOString() : null
+            })
+        });
+        toggleEdit(false); loadTaskData();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>

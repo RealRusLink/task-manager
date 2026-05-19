@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <title>TM HOME</title>
+    <style>
+        body { font-family: system-ui, sans-serif; line-height: 1.5; max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f9; color: #333; }
+        nav { display: flex; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; }
+        nav a { text-decoration: none; color: #4f46e5; font-weight: 600; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        button { cursor: pointer; padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #ddd; background: white; transition: 0.2s; }
+        button:hover:not(:disabled) { background: #f0f0f0; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #4f46e5; color: white; border: none; }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; }
+    </style>
 </head>
 <body>
 
 <nav>
-    <a href="index.html">TM HOME</a>
+    <a href="index.html" style="margin-right: auto; color: #000;">TM HOME</a>
     <a href="index.html">Home</a>
+    <a href="task.html">Tasks</a>
     <a href="profile.html">Profile</a>
 </nav>
 
-<section id="page-dashboard">
+<section id="page-dashboard" class="card">
     <h1>Main Page</h1>
     <p id="authStatusText">Checking session status...</p>
-
-    <button id="dashGoProfile" onclick="location.href='profile.html'">Go to Profile</button>
-    <button id="dashStartAuth" onclick="startIdpAuth()">Authentication</button>
+    <div style="display: flex; gap: 10px;">
+        <button id="dashGoTasks" class="btn-primary" onclick="location.href='task.html'">Go to Tasks</button>
+        <button id="dashGoProfile" onclick="location.href='profile.html'">Profile Settings</button>
+        <button id="dashStartAuth" onclick="startIdpAuth()">Authentication</button>
+    </div>
 </section>
 
 <script>
@@ -27,12 +41,11 @@
         auditor: "my_tm"
     };
 
-    window.addEventListener('DOMContentLoaded', () => {
-        checkSession();
-    });
+    window.addEventListener('DOMContentLoaded', checkSession);
 
     async function checkSession() {
         const statusText = document.getElementById('authStatusText');
+        const btnTasks = document.getElementById('dashGoTasks');
         const btnProfile = document.getElementById('dashGoProfile');
         const btnAuth = document.getElementById('dashStartAuth');
 
@@ -40,12 +53,14 @@
             const res = await fetch('/api/user/');
             if (res.ok) {
                 const data = await res.json();
-                statusText.innerHTML = `Welcome back, <strong>${data.user.username}</strong>. You are currently authenticated.`;
+                statusText.innerHTML = `Welcome back, <strong>${data.user.username}</strong>.`;
                 btnAuth.disabled = true;
+                btnTasks.disabled = false;
                 btnProfile.disabled = false;
             } else {
-                statusText.innerText = "You are not authenticated. Please enter via our secure provider.";
+                statusText.innerText = "Please authenticate to access your tasks.";
                 btnAuth.disabled = false;
+                btnTasks.disabled = true;
                 btnProfile.disabled = true;
             }
         } catch (e) {
