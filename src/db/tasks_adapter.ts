@@ -200,6 +200,35 @@ export class DBTasksAdapter {
         }
     }
 
+    async findPath(authorId: string, taskId: string): Promise<{name: string, id: string}[]> {
+        try {
+            const query = `
+                WITH RECURSIVE path_tree AS (
+                    SELECT task_id, name, parent_id, 0 as level
+                    FROM tasks
+                    WHERE task_id = $1 AND author_id = $2
+                    UNION ALL
+                    SELECT t.task_id, t.name, t.parent_id, pt.level + 1
+                    FROM tasks t
+                    JOIN path_tree pt ON t.task_id = pt.parent_id
+                    WHERE t.author_id = $2
+                )
+                SELECT name, task_id as id
+                FROM path_tree
+                ORDER BY level DESC;
+            `;
+            const res = await this.connection.pool.query(query, [taskId, authorId]);
+
+            if (res.rowCount === 0) {
+                throw new BusinessError("Task not found", 404);
+            }
+            return res.rows;
+        } catch (e) {
+            if (e instanceof BusinessError) throw e;
+            throw new InfrastructureError("Failed to find task path", 500);
+        }
+    }
+
 
 
     async searchTasks(authorId: string, filters: {
@@ -211,7 +240,7 @@ export class DBTasksAdapter {
     }): Promise<taskFull[]> {
         try {
             let query = `SELECT * FROM tasks WHERE author_id = $1 AND is_active = $2`;
-            const params: any[] = [authorId, (filters.is_active ?? false)];
+            const params: any[] = [authorId, (filters.is_active ?? true)];
             let i = 3;
 
             if (filters.category) {

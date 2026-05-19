@@ -86,6 +86,7 @@ export class Tasks extends Hono{
         this.get("/", (c) => this.getTasksSearch(c));
         this.post("/", (c) => this.createTask(c));
         this.get("/:task_id", (c) => this.getTask(c));
+        this.get("/:task_id/path", (c) => this.getTaskPath(c));
         this.get("/:task_id/", (c) => this.getTaskChildren(c));
         this.patch("/:task_id", (c) => this.changeTask(c));
         this.delete("/:task_id", (c) => this.softDeleteTask(c));
@@ -200,6 +201,18 @@ export class Tasks extends Hono{
         const { is_active } = querySchema.parse(data.query || {});
         const tasks = await this.DBTasksApi.searchTasks(data.id, {parent_id: data.task_id, is_active: !!is_active})
         return c.json({tasks: this.sortTasksInSequence(tasks)}, 200);
+    }
+
+
+    async getTaskPath(c: Context) {
+        const data = this.#getData(c);
+        if (!data.task_id) {
+            throw new BusinessError();
+        }
+
+        const path = await this.DBTasksApi.findPath(data.id, data.task_id);
+
+        return c.json({ path }, 200);
     }
 
 

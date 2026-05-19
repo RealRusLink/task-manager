@@ -53,7 +53,7 @@ export class Api extends Hono{
         const jwt = await this.ExchangeApi.getJWT(code);
 
         setCookie(c, "jwt", jwt);
-        return c.redirect("http://localhost:8080", 303);
+        return c.redirect("http://127.0.0.1:8080", 303);
     }
 
 }
@@ -90,7 +90,7 @@ export class User extends Hono{
 
     async logout(c: Context) {
         const frontendRedirect = c.req.query("redirect_url");
-        const finalTarget = frontendRedirect || "http://localhost:8080/";
+        const finalTarget = frontendRedirect || "http://127.0.0.1:8080/index.html";
 
         deleteCookie(c, 'jwt', { path: '/' });
 
